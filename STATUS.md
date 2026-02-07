@@ -5,26 +5,9 @@
 | Source | Records | Countries | Year Range |
 |--------|---------|-----------|------------|
 | CDC FluView (`usa_cdc`) | 47,383 | 1 (US) | 2008-2026 |
-| WHO FluNet (`who_flunet`) | 109,504 | 168 | 2016-2026 |
-| **Total** | **156,887** | **168** | **2008-2026** |
-
-### WHO FluNet Yearly Breakdown
-
-| Year | Records | Countries |
-|------|---------|-----------|
-| 2016 | 8,289 | 141 |
-| 2017 | 8,022 | 152 |
-| 2018 | 10,223 | 162 |
-| 2019 | 9,865 | 165 |
-| 2020 | 4,268 | 161 |
-| 2021 | 2,928 | 130 |
-| 2022 | 8,125 | 152 |
-| 2023 | 11,011 | 165 |
-| 2024 | 20,104 | 168 |
-| 2025 | 25,734 | 167 |
-| 2026 | 935 | 128 |
-
-Note: 2020-2021 low counts reflect real-world flu suppression during COVID-19.
+| WHO FluNet (`who_flunet`) | 109,504 | 184 | 2016-2026 |
+| UKHSA (`uk_ukhsa`) | 411 | 1 (GB) | 2015-2026 |
+| **Total** | **157,298** | **184** | **2008-2026** |
 
 ## Working Scrapers
 
@@ -32,24 +15,31 @@ Note: 2020-2021 low counts reflect real-world flu suppression during COVID-19.
 |---------|--------|----------|----------|
 | CDC FluView | Working | Every 6h at :15 | `gis.cdc.gov/grasp/fluView1/` |
 | WHO FluNet | Working | Every 6h on startup | `xmart-api-public.who.int/FLUMART/VIW_FNT` |
-| UK UKHSA | Not verified | Every 6h at :30 | Unknown status |
-| India NCDC | Not verified | Every 12h at :45 | Unknown status |
-| Brazil SVS | Not verified | Every 12h at :00 | Unknown status |
+| UK UKHSA | Working | Every 6h at :30 | `api.ukhsa-dashboard.data.gov.uk/...` |
+| India NCDC | Not verified | Every 12h at :45 | Likely broken |
+| Brazil SVS | Not verified | Every 12h at :00 | Likely broken |
 
-## Recent Changes (this session)
+## Changes (this session)
 
-### Historical Seasons API + Chart (completed)
+### Historical Seasons API + Chart
 - Added `GET /api/trends/historical-seasons?country=US&seasons=5` endpoint
 - Returns real seasonal data (Oct-Sep flu seasons) with week-of-season indexing
 - Frontend `drawHistoricalOverlay()` now uses real data instead of random noise
 - Deleted `_generateHistoricalSeasons()` fake data generator
 
-### WHO FluNet Scraper Fix + Backfill (completed)
+### WHO FluNet Scraper Fix + Backfill
 - Old Azure Front Door endpoint (`frontdoor-l4uikgap6gz3m.azurefd.net`) is dead
 - Rewrote scraper to use WHO xMart public OData API
 - Added `fetch_range()` method for flexible year/week queries
-- Improved subtype parsing to avoid double-counting (specific subtypes prioritized over aggregates)
-- Created `backfill_flunet.py` script and ran 10-year backfill successfully
+- Improved subtype parsing to avoid double-counting
+- Created `backfill_flunet.py` and ran 10-year backfill (109,504 records)
+
+### UKHSA Scraper Fix + Backfill
+- Old endpoints (`ukhsa-dashboard.data.gov.uk/api` and gov.uk HTML scraping) replaced
+- Rewrote scraper for `api.ukhsa-dashboard.data.gov.uk` dashboard API
+- Uses hospital admission rate metric, converts per-100k rates to estimated cases
+- Handles aggressive rate limiting (8-15s delay between requests)
+- Created `backfill_ukhsa.py` and ran 10-year backfill (411 records, nation-level)
 
 ## Infrastructure
 - Docker Compose: 3 containers (app, db/TimescaleDB, nginx)

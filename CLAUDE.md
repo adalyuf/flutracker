@@ -38,6 +38,11 @@ Port 5432 is mapped to the host in docker-compose.yml.
   - Each year takes ~2s to fetch, ~5-9s to deduplicate & store
   - Backfill has been run: 2016-2026 data is loaded (109,504 records)
 
+- `python -m backend.ingestion.backfill_ukhsa [--from-year 2015] [--to-year 2026] [--regions] [--dry-run]`
+  - Downloads UKHSA hospital admission rate data year-by-year
+  - ~411 nation-level records for 10 years; `--regions` adds 9 UKHSA regions (slower due to rate limiting)
+  - Backfill has been run: 2015-2026 nation data loaded (411 records)
+
 ## Config Gotcha
 `backend/app/config.py` uses pydantic-settings with `extra="ignore"` because the `.env` file contains Docker Compose variables (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`) that aren't declared in the Settings class.
 
@@ -60,6 +65,19 @@ Port 5432 is mapped to the host in docker-compose.yml.
 - FluNet records use: `country_code=<ISO2>`, `source="who_flunet"`, `flu_type=<subtype>`
 - Subtype parsing: specific subtypes (AH1N12009, AH3, BVIC, BYAM) are preferred over aggregates (INF_A, INF_B) to avoid double-counting
 
+## UKHSA Dashboard API
+- **Endpoint**: `https://api.ukhsa-dashboard.data.gov.uk/themes/infectious_disease/sub_themes/respiratory/topics/Influenza/geography_types/{geo_type}/geographies/{geo}/metrics/{metric}`
+- **Swagger**: `https://api.ukhsa-dashboard.data.gov.uk/api/swagger/`
+- Topic name is `Influenza` (capital I) — case-sensitive
+- Page size max is **365**; paginate with `page` param
+- **Aggressively rate-limited**: needs 8-15s delay between requests; empty 200 response = rate limited
+- Data covers **England only** (Scotland/Wales/NI have separate systems)
+- Key metrics: `influenza_healthcare_hospitalAdmissionRateByWeek` (from 2015), `influenza_testing_positivityByWeek` (from 2017), `influenza_healthcare_ICUHDUadmissionRateByWeek`
+- Geographies: Nation (`England`), UKHSA Region (9 regions), UKHSA Super-Region (4 regions)
+- `metric_value` for hospital admissions is a **rate per 100k** — scraper converts to estimated cases using population
+- Filter params: `age` (use `all`), `year`, `epiweek`, `page_size`
+- UKHSA records use: `country_code="GB"`, `source="uk_ukhsa"`, `region=None` (or region name with `--regions`)
+
 ## Historical Seasons Endpoint
 - `GET /api/trends/historical-seasons?country=US&seasons=5`
 - Flu season = Oct 1 → Sep 30 (northern hemisphere)
@@ -73,12 +91,16 @@ Port 5432 is mapped to the host in docker-compose.yml.
 - CDC records use: `country_code="US"`, `source="usa_cdc"`, `region=<state name>`, `flu_type=None`
 - `new_cases` for CDC is an estimate mapped from ILI activity level (0-13) since the API provides intensity levels, not raw counts
 - FluNet records use: `country_code=<ISO2>`, `source="who_flunet"`, `region=None`, `flu_type=<subtype>`
-- As of 2026-02-07: 156,887 total records (47k CDC + 109k FluNet)
+- UKHSA records use: `country_code="GB"`, `source="uk_ukhsa"`, `region=None` or region name
+- As of 2026-02-07: 157,298 total records (47k CDC + 109k FluNet + 411 UKHSA)
 
 ## Next Steps
-- **Verify other scrapers**: UK UKHSA, India NCDC, and Brazil SVS scrapers are scheduled but may have broken endpoints (similar to the old FluNet URL). Test each and fix.
+- **Fix India NCDC and Brazil SVS scrapers**: These are scheduled but likely have broken endpoints (similar to the old FluNet/UKHSA URLs). Test each, find working APIs, rewrite, and backfill.
+- **UKHSA regional backfill**: The `--regions` flag exists but hasn't been run yet. Would add 9 UKHSA regions but is slow due to rate limiting (~9 * 12 years * 10s = ~18 min).
+- **UKHSA data is low volume**: Only 411 records (nation-level, 1 data point per week). This is because it's admission *rates* converted to estimated counts. Consider also ingesting `influenza_testing_positivityByWeek` (positivity %) as a separate metric if richer UK data is needed.
 - **Deduplication performance**: Row-by-row dedup (`_deduplicate` in `BaseScraper`) is O(n) DB queries. For large backfills, consider batch dedup using `INSERT ... ON CONFLICT DO NOTHING` or a temp table approach.
 - **FluNet `flu_type` aggregation**: The historical-seasons endpoint sums all `flu_type` rows for a country/week. If subtype-level historical charts are desired, the endpoint needs a `flu_type` filter or grouped response.
 - **Southern hemisphere seasons**: The historical-seasons endpoint hardcodes Oct-Sep (NH). Countries like Australia/Brazil have flu seasons ~Apr-Sep. Could add hemisphere-aware season boundaries.
-- **Map/GeoJSON with FluNet data**: The map view likely only shows countries with data. With 168 countries now in FluNet, verify the map populates globally.
-- **Frontend country selector**: With 168 countries having data, the country dropdown/selector should be populated from countries that actually have data, not just the 94 seeded ones.
+- **Map/GeoJSON with FluNet data**: The map view likely only shows countries with recent data. With 184 countries now in FluNet, verify the map populates globally and that the time window used for the map is wide enough.
+- **Frontend country selector**: With 184 countries having data, the country dropdown/selector should be populated from countries that actually have data, not just the 94 seeded ones.
+- **GB data overlap**: UKHSA provides England-specific data under `country_code="GB"`, while FluNet also has GB data. The historical-seasons endpoint and trend charts will sum both sources for GB. May want to deduplicate across sources or clearly separate them.
