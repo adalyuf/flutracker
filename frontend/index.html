@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FluTracker — Global Influenza Surveillance</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- App CSS -->
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <h1 class="logo">FluTracker</h1>
+            <span class="subtitle">Global Influenza Surveillance</span>
+        </div>
+        <div class="header-center">
+            <div class="hemisphere-toggle" id="hemisphereToggle">
+                <button class="toggle-btn active" data-hemisphere="calendar">Calendar</button>
+                <button class="toggle-btn" data-hemisphere="northern">N. Hemisphere</button>
+                <button class="toggle-btn" data-hemisphere="southern">S. Hemisphere</button>
+            </div>
+        </div>
+        <div class="header-right">
+            <span class="last-updated" id="lastUpdated">Loading...</span>
+        </div>
+    </header>
+
+    <!-- Anomaly Alert Bar -->
+    <div class="alert-bar" id="alertBar" style="display: none;">
+        <span class="alert-icon">&#9888;</span>
+        <span class="alert-label">Anomaly Alerts:</span>
+        <div class="alert-scroll" id="alertScroll"></div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main-grid">
+        <!-- Left: Map -->
+        <section class="panel map-panel">
+            <div class="panel-header">
+                <h2>Global Map</h2>
+                <div class="map-controls">
+                    <select id="mapMetric">
+                        <option value="cases">Total Cases (7d)</option>
+                        <option value="per_100k">Cases per 100k</option>
+                        <option value="trend">Trend %</option>
+                        <option value="severity">Severity Index</option>
+                    </select>
+                </div>
+            </div>
+            <div id="map" class="map-container"></div>
+            <div class="map-legend" id="mapLegend"></div>
+        </section>
+
+        <!-- Right: Charts -->
+        <section class="panel charts-panel">
+            <div class="panel-header">
+                <h2 id="chartTitle">Global Trend</h2>
+                <div class="chart-controls">
+                    <button class="chart-btn active" data-view="trend">Trend</button>
+                    <button class="chart-btn" data-view="subtype">Subtypes</button>
+                    <button class="chart-btn" data-view="historical">Historical</button>
+                    <button class="chart-btn" data-view="forecast">Forecast</button>
+                    <button class="chart-btn" data-view="compare">Compare</button>
+                </div>
+            </div>
+            <div id="chartContainer" class="chart-container">
+                <svg id="mainChart"></svg>
+            </div>
+            <!-- Comparison country selector (hidden by default) -->
+            <div class="compare-selector" id="compareSelector" style="display: none;">
+                <label>Compare:</label>
+                <select id="compareCountry1" class="compare-select"></select>
+                <select id="compareCountry2" class="compare-select"></select>
+                <select id="compareCountry3" class="compare-select"></select>
+            </div>
+        </section>
+    </main>
+
+    <!-- Dashboard Table -->
+    <section class="panel dashboard-panel">
+        <div class="panel-header">
+            <h2>Dashboard</h2>
+            <div class="dashboard-controls">
+                <input type="text" id="searchInput" class="search-input" placeholder="Search countries...">
+                <select id="filterContinent" class="filter-select">
+                    <option value="">All Continents</option>
+                    <option value="Africa">Africa</option>
+                    <option value="Asia">Asia</option>
+                    <option value="Europe">Europe</option>
+                    <option value="North America">North America</option>
+                    <option value="South America">South America</option>
+                    <option value="Oceania">Oceania</option>
+                </select>
+                <select id="filterFluType" class="filter-select">
+                    <option value="">All Flu Types</option>
+                    <option value="H1N1">H1N1</option>
+                    <option value="H3N2">H3N2</option>
+                    <option value="B/Victoria">B/Victoria</option>
+                    <option value="B/Yamagata">B/Yamagata</option>
+                </select>
+                <select id="sortBy" class="filter-select">
+                    <option value="cases_desc">Cases (High to Low)</option>
+                    <option value="cases_asc">Cases (Low to High)</option>
+                    <option value="trend_desc">Trend (Rising)</option>
+                    <option value="trend_asc">Trend (Falling)</option>
+                    <option value="severity_desc">Severity (High to Low)</option>
+                    <option value="name_asc">Name (A-Z)</option>
+                </select>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table class="dashboard-table" id="dashboardTable">
+                <thead>
+                    <tr>
+                        <th class="col-rank">#</th>
+                        <th class="col-country sortable" data-sort="name">Country</th>
+                        <th class="col-cases sortable" data-sort="cases">Cases (7d)</th>
+                        <th class="col-rate sortable" data-sort="rate">Per 100k</th>
+                        <th class="col-trend sortable" data-sort="trend">Trend</th>
+                        <th class="col-sparkline">12-Week</th>
+                        <th class="col-severity sortable" data-sort="severity">Severity</th>
+                        <th class="col-subtypes">Dominant Type</th>
+                    </tr>
+                </thead>
+                <tbody id="dashboardBody">
+                    <tr><td colspan="8" class="loading-cell">Loading data...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>Data sources: WHO FluNet, CDC FluView, UKHSA, NCDC India, InfoGripe Brazil</p>
+        <p>FluTracker is for informational purposes only. Not a substitute for official public health guidance.</p>
+    </footer>
+
+    <!-- Libraries -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://d3js.org/topojson.v3.min.js"></script>
+
+    <!-- App modules -->
+    <script src="js/utils.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/forecast.js"></script>
+    <script src="js/anomalies.js"></script>
+    <script src="js/comparison.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

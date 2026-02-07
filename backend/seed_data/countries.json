@@ -1,0 +1,761 @@
+{
+  "metadata": {
+    "description": "Countries with population over 10 million, for flu surveillance tracking",
+    "population_year": 2025,
+    "generated": "2026-02-06"
+  },
+  "countries": [
+    {
+      "code": "CN",
+      "name": "China",
+      "population": 1410000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "IN",
+      "name": "India",
+      "population": 1440000000,
+      "continent": "Asia",
+      "scraper_id": "india_ncdc",
+      "scrape_frequency": "daily"
+    },
+    {
+      "code": "US",
+      "name": "United States",
+      "population": 340000000,
+      "continent": "North America",
+      "scraper_id": "usa_cdc",
+      "scrape_frequency": "daily"
+    },
+    {
+      "code": "ID",
+      "name": "Indonesia",
+      "population": 279000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "PK",
+      "name": "Pakistan",
+      "population": 236000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "BR",
+      "name": "Brazil",
+      "population": 217000000,
+      "continent": "South America",
+      "scraper_id": "brazil_svs",
+      "scrape_frequency": "daily"
+    },
+    {
+      "code": "NG",
+      "name": "Nigeria",
+      "population": 230000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "BD",
+      "name": "Bangladesh",
+      "population": 175000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "RU",
+      "name": "Russia",
+      "population": 144000000,
+      "continent": "Europe",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "MX",
+      "name": "Mexico",
+      "population": 130000000,
+      "continent": "North America",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "ET",
+      "name": "Ethiopia",
+      "population": 130000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "JP",
+      "name": "Japan",
+      "population": 123000000,
+      "continent": "Asia",
+      "scraper_id": "japan_niid",
+      "scrape_frequency": "daily"
+    },
+    {
+      "code": "PH",
+      "name": "Philippines",
+      "population": 117000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "EG",
+      "name": "Egypt",
+      "population": 106000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "CD",
+      "name": "Democratic Republic of the Congo",
+      "population": 105000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "VN",
+      "name": "Vietnam",
+      "population": 100000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "TR",
+      "name": "Turkey",
+      "population": 86000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "IR",
+      "name": "Iran",
+      "population": 89000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "DE",
+      "name": "Germany",
+      "population": 84000000,
+      "continent": "Europe",
+      "scraper_id": "germany_rki",
+      "scrape_frequency": "daily"
+    },
+    {
+      "code": "TH",
+      "name": "Thailand",
+      "population": 72000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "GB",
+      "name": "United Kingdom",
+      "population": 68000000,
+      "continent": "Europe",
+      "scraper_id": "uk_ukhsa",
+      "scrape_frequency": "daily"
+    },
+    {
+      "code": "FR",
+      "name": "France",
+      "population": 68000000,
+      "continent": "Europe",
+      "scraper_id": "france_spf",
+      "scrape_frequency": "daily"
+    },
+    {
+      "code": "TZ",
+      "name": "Tanzania",
+      "population": 67000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "ZA",
+      "name": "South Africa",
+      "population": 62000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "IT",
+      "name": "Italy",
+      "population": 59000000,
+      "continent": "Europe",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "MM",
+      "name": "Myanmar",
+      "population": 55000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "KE",
+      "name": "Kenya",
+      "population": 56000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "KR",
+      "name": "South Korea",
+      "population": 52000000,
+      "continent": "Asia",
+      "scraper_id": "korea_kdca",
+      "scrape_frequency": "daily"
+    },
+    {
+      "code": "CO",
+      "name": "Colombia",
+      "population": 52000000,
+      "continent": "South America",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "ES",
+      "name": "Spain",
+      "population": 48000000,
+      "continent": "Europe",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "UG",
+      "name": "Uganda",
+      "population": 49000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "AR",
+      "name": "Argentina",
+      "population": 46000000,
+      "continent": "South America",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "SD",
+      "name": "Sudan",
+      "population": 48000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "DZ",
+      "name": "Algeria",
+      "population": 46000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "IQ",
+      "name": "Iraq",
+      "population": 44000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "AF",
+      "name": "Afghanistan",
+      "population": 42000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "PL",
+      "name": "Poland",
+      "population": 37000000,
+      "continent": "Europe",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "CA",
+      "name": "Canada",
+      "population": 41000000,
+      "continent": "North America",
+      "scraper_id": "canada_phac",
+      "scrape_frequency": "daily"
+    },
+    {
+      "code": "MA",
+      "name": "Morocco",
+      "population": 38000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "SA",
+      "name": "Saudi Arabia",
+      "population": 37000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "UA",
+      "name": "Ukraine",
+      "population": 37000000,
+      "continent": "Europe",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "PE",
+      "name": "Peru",
+      "population": 34000000,
+      "continent": "South America",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "AO",
+      "name": "Angola",
+      "population": 37000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "MY",
+      "name": "Malaysia",
+      "population": 34000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "MZ",
+      "name": "Mozambique",
+      "population": 34000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "GH",
+      "name": "Ghana",
+      "population": 34000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "YE",
+      "name": "Yemen",
+      "population": 34000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "NP",
+      "name": "Nepal",
+      "population": 31000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "VE",
+      "name": "Venezuela",
+      "population": 29000000,
+      "continent": "South America",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "CI",
+      "name": "Ivory Coast",
+      "population": 29000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "MG",
+      "name": "Madagascar",
+      "population": 30000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "CM",
+      "name": "Cameroon",
+      "population": 29000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "AU",
+      "name": "Australia",
+      "population": 27000000,
+      "continent": "Oceania",
+      "scraper_id": "australia_doh",
+      "scrape_frequency": "daily"
+    },
+    {
+      "code": "NE",
+      "name": "Niger",
+      "population": 27000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "TW",
+      "name": "Taiwan",
+      "population": 24000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "ML",
+      "name": "Mali",
+      "population": 23000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "BF",
+      "name": "Burkina Faso",
+      "population": 23000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "LK",
+      "name": "Sri Lanka",
+      "population": 22000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "MW",
+      "name": "Malawi",
+      "population": 21000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "ZM",
+      "name": "Zambia",
+      "population": 21000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "CL",
+      "name": "Chile",
+      "population": 20000000,
+      "continent": "South America",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "KZ",
+      "name": "Kazakhstan",
+      "population": 20000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "TD",
+      "name": "Chad",
+      "population": 18000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "EC",
+      "name": "Ecuador",
+      "population": 18000000,
+      "continent": "South America",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "SY",
+      "name": "Syria",
+      "population": 23000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "NL",
+      "name": "Netherlands",
+      "population": 18000000,
+      "continent": "Europe",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "SN",
+      "name": "Senegal",
+      "population": 18000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "GT",
+      "name": "Guatemala",
+      "population": 18000000,
+      "continent": "North America",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "SO",
+      "name": "Somalia",
+      "population": 18000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "RW",
+      "name": "Rwanda",
+      "population": 14000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "ZW",
+      "name": "Zimbabwe",
+      "population": 16000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "GN",
+      "name": "Guinea",
+      "population": 14000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "BI",
+      "name": "Burundi",
+      "population": 13000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "BJ",
+      "name": "Benin",
+      "population": 14000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "BO",
+      "name": "Bolivia",
+      "population": 12000000,
+      "continent": "South America",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "HT",
+      "name": "Haiti",
+      "population": 12000000,
+      "continent": "North America",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "BE",
+      "name": "Belgium",
+      "population": 12000000,
+      "continent": "Europe",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "CU",
+      "name": "Cuba",
+      "population": 11000000,
+      "continent": "North America",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "SS",
+      "name": "South Sudan",
+      "population": 12000000,
+      "continent": "Africa",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "DO",
+      "name": "Dominican Republic",
+      "population": 11000000,
+      "continent": "North America",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "CZ",
+      "name": "Czech Republic",
+      "population": 11000000,
+      "continent": "Europe",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "GR",
+      "name": "Greece",
+      "population": 10000000,
+      "continent": "Europe",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "JO",
+      "name": "Jordan",
+      "population": 11000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "PT",
+      "name": "Portugal",
+      "population": 10000000,
+      "continent": "Europe",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "SE",
+      "name": "Sweden",
+      "population": 11000000,
+      "continent": "Europe",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "AZ",
+      "name": "Azerbaijan",
+      "population": 10000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "HN",
+      "name": "Honduras",
+      "population": 10000000,
+      "continent": "North America",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "HU",
+      "name": "Hungary",
+      "population": 10000000,
+      "continent": "Europe",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "TJ",
+      "name": "Tajikistan",
+      "population": 10000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "AE",
+      "name": "United Arab Emirates",
+      "population": 10000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "BY",
+      "name": "Belarus",
+      "population": 10000000,
+      "continent": "Europe",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "KH",
+      "name": "Cambodia",
+      "population": 17000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "RO",
+      "name": "Romania",
+      "population": 19000000,
+      "continent": "Europe",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    },
+    {
+      "code": "UZ",
+      "name": "Uzbekistan",
+      "population": 36000000,
+      "continent": "Asia",
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
+    }
+  ]
+}
