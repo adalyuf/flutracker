@@ -43,6 +43,12 @@ Port 5432 is mapped to the host in docker-compose.yml.
   - ~411 nation-level records for 10 years; `--regions` adds 9 UKHSA regions (slower due to rate limiting)
   - Backfill has been run: 2015-2026 nation data loaded (411 records)
 
+- `python -m backend.ingestion.backfill_brazil [--from-year 2019] [--to-year 2025] [--dry-run]`
+  - Downloads SRAG CSV files from OpenDataSUS S3, filters flu-confirmed cases
+  - Aggregates by state + epi week + flu type; provides 27-state breakdown for Brazil
+  - CSV files are 100-320MB each, streamed row-by-row to avoid memory issues
+  - Frozen bank URLs (2019-2024) are hardcoded; current year URL is scraped from the dataset page
+
 ## Config Gotcha
 `backend/app/config.py` uses pydantic-settings with `extra="ignore"` because the `.env` file contains Docker Compose variables (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`) that aren't declared in the Settings class.
 
@@ -78,6 +84,20 @@ Port 5432 is mapped to the host in docker-compose.yml.
 - Filter params: `age` (use `all`), `year`, `epiweek`, `page_size`
 - UKHSA records use: `country_code="GB"`, `source="uk_ukhsa"`, `region=None` (or region name with `--regions`)
 
+## Brazil OpenDataSUS SIVEP-Gripe
+- **Data source**: OpenDataSUS SRAG CSV files on S3
+- **Dataset page**: `https://dadosabertos.saude.gov.br/dataset/srag-2019-a-2026`
+- **S3 pattern**: `https://s3.sa-east-1.amazonaws.com/ckan.saude.gov.br/SRAG/{year}/INFLUD{yy}-{date}.csv`
+- Old InfoGripe API (`info.gripe.fiocruz.br`) is **dead** (ECONNREFUSED) — do not use
+- CSV files are semicolon-delimited, 100-320MB, ~194 columns per record
+- Updated weekly on Wednesdays; frozen banks (closed years) have stable filenames
+- **Key columns**: `SG_UF_NOT` (state code), `SEM_NOT` (epi week), `DT_NOTIFIC` (notification date), `CLASSI_FIN` (final classification), `POS_PCRFLU` (PCR flu positive), `TP_FLU_PCR` (flu type), `PCR_FLUASU` (flu A subtype)
+- **Flu filter**: `CLASSI_FIN=1` (SRAG by influenza) OR `POS_PCRFLU=1` (PCR positive for flu)
+- **Flu type mapping**: TP_FLU_PCR=1+PCR_FLUASU=1→H1N1pdm09, =2→H3N2, other→A (unsubtyped); TP_FLU_PCR=2→B; else→unknown
+- Brazil SVS records use: `country_code="BR"`, `source="brazil_svs"`, `region=<state name>`, `flu_type=<subtype>`
+- Scraper streams CSV to avoid loading 300MB into memory; uses `httpx` streaming + `csv.reader`
+- `fetch_year(year)` method available for backfill (uses frozen URLs for 2019-2024, scrapes dataset page for current year)
+
 ## Historical Seasons Endpoint
 - `GET /api/trends/historical-seasons?country=US&seasons=5`
 - Flu season = Oct 1 → Sep 30 (northern hemisphere)
@@ -95,7 +115,9 @@ Port 5432 is mapped to the host in docker-compose.yml.
 - As of 2026-02-07: 157,298 total records (47k CDC + 109k FluNet + 411 UKHSA)
 
 ## Next Steps
-- **Fix India NCDC and Brazil SVS scrapers**: These are scheduled but likely have broken endpoints (similar to the old FluNet/UKHSA URLs). Test each, find working APIs, rewrite, and backfill.
+- **Expand to State/Province Granularity**: Expand the table in dashboard to have state or province level granularity, update map to show this level as well, if available.
+- **Fix India NCDC scraper**: Scheduled but likely has a broken endpoint (similar to old FluNet/UKHSA URLs). Test, find working API, rewrite, and backfill.
+- **Run Brazil SVS backfill**: Scraper has been rewritten to use OpenDataSUS SIVEP-Gripe CSVs. Run `python -m backend.ingestion.backfill_brazil --from-year 2019 --to-year 2025` to load state-level historical data.
 - **UKHSA regional backfill**: The `--regions` flag exists but hasn't been run yet. Would add 9 UKHSA regions but is slow due to rate limiting (~9 * 12 years * 10s = ~18 min).
 - **UKHSA data is low volume**: Only 411 records (nation-level, 1 data point per week). This is because it's admission *rates* converted to estimated counts. Consider also ingesting `influenza_testing_positivityByWeek` (positivity %) as a separate metric if richer UK data is needed.
 - **Deduplication performance**: Row-by-row dedup (`_deduplicate` in `BaseScraper`) is O(n) DB queries. For large backfills, consider batch dedup using `INSERT ... ON CONFLICT DO NOTHING` or a temp table approach.
