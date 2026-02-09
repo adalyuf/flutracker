@@ -18,8 +18,8 @@ async def get_map_geojson(
     db: AsyncSession = Depends(get_db),
 ):
     """Return GeoJSON FeatureCollection with per-country flu stats for map coloring."""
-    now = datetime.utcnow()
-    since = now - timedelta(days=period)
+    anchor = (await db.execute(select(func.max(FluCase.time)))).scalar() or datetime.utcnow()
+    since = anchor - timedelta(days=period)
     prev_since = since - timedelta(days=period)
 
     # Current period cases by country

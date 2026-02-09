@@ -14,9 +14,9 @@ router = APIRouter(tags=["severity"])
 @router.get("/severity", response_model=list[SeverityOut])
 async def get_severity_index(db: AsyncSession = Depends(get_db)):
     """Compute composite severity index for all countries."""
-    now = datetime.utcnow()
-    week_ago = now - timedelta(days=7)
-    two_weeks_ago = now - timedelta(days=14)
+    anchor = (await db.execute(select(func.max(FluCase.time)))).scalar() or datetime.utcnow()
+    week_ago = anchor - timedelta(days=7)
+    two_weeks_ago = anchor - timedelta(days=14)
 
     # Get all countries
     countries_result = await db.execute(select(Country))

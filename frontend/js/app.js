@@ -67,7 +67,7 @@ const App = {
                 summary,
             ] = await Promise.all([
                 API.getCountries(),
-                API.getMapGeoJSON(7),
+                API.getMapGeoJSON(14),
                 API.getSeverity(),
                 API.getAnomalies(7),
                 API.getSummary(),

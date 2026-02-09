@@ -16,9 +16,9 @@ async def list_countries(
     continent: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    now = datetime.utcnow()
-    week_ago = now - timedelta(days=7)
-    two_weeks_ago = now - timedelta(days=14)
+    anchor = (await db.execute(select(func.max(FluCase.time)))).scalar() or datetime.utcnow()
+    week_ago = anchor - timedelta(days=7)
+    two_weeks_ago = anchor - timedelta(days=14)
 
     # Get all countries
     query = select(Country).order_by(Country.name)
@@ -71,9 +71,10 @@ async def list_countries(
 @router.get("/summary", response_model=SummaryOut)
 async def get_summary(db: AsyncSession = Depends(get_db)):
     now = datetime.utcnow()
-    week_ago = now - timedelta(days=7)
-    four_weeks_ago = now - timedelta(days=28)
-    two_weeks_ago = now - timedelta(days=14)
+    anchor = (await db.execute(select(func.max(FluCase.time)))).scalar() or now
+    week_ago = anchor - timedelta(days=7)
+    four_weeks_ago = anchor - timedelta(days=28)
+    two_weeks_ago = anchor - timedelta(days=14)
 
     # Total countries
     country_count = await db.execute(select(func.count()).select_from(Country))
