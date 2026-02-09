@@ -112,12 +112,14 @@ Port 5432 is mapped to the host in docker-compose.yml.
 - `new_cases` for CDC is an estimate mapped from ILI activity level (0-13) since the API provides intensity levels, not raw counts
 - FluNet records use: `country_code=<ISO2>`, `source="who_flunet"`, `region=None`, `flu_type=<subtype>`
 - UKHSA records use: `country_code="GB"`, `source="uk_ukhsa"`, `region=None` or region name
-- As of 2026-02-07: 157,298 total records (47k CDC + 109k FluNet + 411 UKHSA)
+- Brazil SVS records use: `country_code="BR"`, `source="brazil_svs"`, `region=<state name>`, `flu_type=<subtype>`
+- As of 2026-02-09: ~170k total records (47k CDC + 109k FluNet + 411 UKHSA + 13k Brazil SVS)
 
 ## Next Steps
 - **Expand to State/Province Granularity**: Expand the table in dashboard to have state or province level granularity, update map to show this level as well, if available.
 - **Fix India NCDC scraper**: Scheduled but likely has a broken endpoint (similar to old FluNet/UKHSA URLs). Test, find working API, rewrite, and backfill.
-- **Run Brazil SVS backfill**: Scraper has been rewritten to use OpenDataSUS SIVEP-Gripe CSVs. Run `python -m backend.ingestion.backfill_brazil --from-year 2019 --to-year 2025` to load state-level historical data.
+- **Brazil SVS backfill done**: 12,972 records (116k flu cases) across 27 states, 2019-2025. Scraper runs on scheduler every 12h. Note: CSV streaming is slow for COVID-era years (2020-2021 have 1M+ rows, take ~10-20 min each). The `fetch_latest()` method downloads the most recent live bank CSV from the dataset page.
+- **Brazil SVS `fetch_latest()` downloads full year**: The scheduled scraper downloads the entire current-year CSV (~300MB) every 12 hours. This is wasteful but unavoidable since OpenDataSUS doesn't offer incremental/date-filtered downloads. Could reduce frequency to weekly (data updates Wednesdays).
 - **UKHSA regional backfill**: The `--regions` flag exists but hasn't been run yet. Would add 9 UKHSA regions but is slow due to rate limiting (~9 * 12 years * 10s = ~18 min).
 - **UKHSA data is low volume**: Only 411 records (nation-level, 1 data point per week). This is because it's admission *rates* converted to estimated counts. Consider also ingesting `influenza_testing_positivityByWeek` (positivity %) as a separate metric if richer UK data is needed.
 - **Deduplication performance**: Row-by-row dedup (`_deduplicate` in `BaseScraper`) is O(n) DB queries. For large backfills, consider batch dedup using `INSERT ... ON CONFLICT DO NOTHING` or a temp table approach.
@@ -126,3 +128,4 @@ Port 5432 is mapped to the host in docker-compose.yml.
 - **Map/GeoJSON with FluNet data**: The map view likely only shows countries with recent data. With 184 countries now in FluNet, verify the map populates globally and that the time window used for the map is wide enough.
 - **Frontend country selector**: With 184 countries having data, the country dropdown/selector should be populated from countries that actually have data, not just the 94 seeded ones.
 - **GB data overlap**: UKHSA provides England-specific data under `country_code="GB"`, while FluNet also has GB data. The historical-seasons endpoint and trend charts will sum both sources for GB. May want to deduplicate across sources or clearly separate them.
+- **BR data overlap**: Brazil SVS provides state-level data under `country_code="BR"`, while FluNet has country-level BR data (1,165 records). Trend charts for BR will sum both sources. May want to exclude FluNet for BR or clearly separate them.
