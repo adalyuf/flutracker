@@ -1,3 +1,5 @@
 .env
 data/
 !frontend/data/
+__pycache__/
+*.pyc

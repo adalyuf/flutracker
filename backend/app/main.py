@@ -19,37 +19,44 @@ async def _init_db():
     from backend.app.database import engine, async_session
     from backend.app.models import Country  # noqa: ensure models loaded
 
-    # Create all tables if they don't exist
+    # Try to enable TimescaleDB; works on TimescaleDB images, skipped on plain Postgres
+    has_timescaledb = False
     async with engine.begin() as conn:
-        # Enable TimescaleDB extension
-        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE"))
+        try:
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE"))
+            has_timescaledb = True
+            logger.info("TimescaleDB extension enabled")
+        except Exception:
+            logger.info("TimescaleDB not available, using plain PostgreSQL")
 
-        # Check if flu_cases is already a hypertable
-        result = await conn.execute(text(
-            "SELECT EXISTS ("
-            "  SELECT 1 FROM timescaledb_information.hypertables "
-            "  WHERE hypertable_name = 'flu_cases'"
-            ")"
-        ))
-        is_hypertable = result.scalar()
+    async with engine.begin() as conn:
+        if has_timescaledb:
+            # Check if flu_cases is already a hypertable
+            result = await conn.execute(text(
+                "SELECT EXISTS ("
+                "  SELECT 1 FROM timescaledb_information.hypertables "
+                "  WHERE hypertable_name = 'flu_cases'"
+                ")"
+            ))
+            is_hypertable = result.scalar()
 
-        if not is_hypertable:
-            # Drop old flu_cases table if it exists with wrong PK structure
-            await conn.execute(text("DROP TABLE IF EXISTS flu_cases CASCADE"))
-            logger.info("Dropped old flu_cases table for hypertable recreation")
+            if not is_hypertable:
+                await conn.execute(text("DROP TABLE IF EXISTS flu_cases CASCADE"))
+                logger.info("Dropped old flu_cases table for hypertable recreation")
 
         await conn.run_sync(Base.metadata.create_all)
         logger.info("Database tables ensured")
 
-    # Create hypertable if not already one
-    async with engine.begin() as conn:
-        try:
-            await conn.execute(text(
-                "SELECT create_hypertable('flu_cases', 'time', if_not_exists => TRUE, migrate_data => TRUE)"
-            ))
-            logger.info("Hypertable ensured")
-        except Exception as e:
-            logger.warning("Hypertable setup note", detail=str(e))
+    # Create hypertable if TimescaleDB is available
+    if has_timescaledb:
+        async with engine.begin() as conn:
+            try:
+                await conn.execute(text(
+                    "SELECT create_hypertable('flu_cases', 'time', if_not_exists => TRUE, migrate_data => TRUE)"
+                ))
+                logger.info("Hypertable ensured")
+            except Exception as e:
+                logger.warning("Hypertable setup note", detail=str(e))
 
     # Load seed data if countries table is empty
     async with async_session() as db:
@@ -116,3 +123,11 @@ app.include_router(severity.router, prefix="/api")
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok"}
+
+# Serve frontend static files (used when running without nginx, e.g. Railway)
+import os
+from pathlib import Path
+
+_frontend_dir = Path(__file__).resolve().parent.parent.parent / "frontend"
+if _frontend_dir.is_dir():
+    app.mount("/", StaticFiles(directory=str(_frontend_dir), html=True), name="frontend")
