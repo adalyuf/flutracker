@@ -15,48 +15,12 @@ logger = structlog.get_logger()
 
 async def _init_db():
     """Create tables and load seed data on first run."""
-    from sqlalchemy import text
     from backend.app.database import engine, async_session
     from backend.app.models import Country  # noqa: ensure models loaded
 
-    # Try to enable TimescaleDB; works on TimescaleDB images, skipped on plain Postgres
-    has_timescaledb = False
     async with engine.begin() as conn:
-        try:
-            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE"))
-            has_timescaledb = True
-            logger.info("TimescaleDB extension enabled")
-        except Exception:
-            logger.info("TimescaleDB not available, using plain PostgreSQL")
-
-    async with engine.begin() as conn:
-        if has_timescaledb:
-            # Check if flu_cases is already a hypertable
-            result = await conn.execute(text(
-                "SELECT EXISTS ("
-                "  SELECT 1 FROM timescaledb_information.hypertables "
-                "  WHERE hypertable_name = 'flu_cases'"
-                ")"
-            ))
-            is_hypertable = result.scalar()
-
-            if not is_hypertable:
-                await conn.execute(text("DROP TABLE IF EXISTS flu_cases CASCADE"))
-                logger.info("Dropped old flu_cases table for hypertable recreation")
-
         await conn.run_sync(Base.metadata.create_all)
         logger.info("Database tables ensured")
-
-    # Create hypertable if TimescaleDB is available
-    if has_timescaledb:
-        async with engine.begin() as conn:
-            try:
-                await conn.execute(text(
-                    "SELECT create_hypertable('flu_cases', 'time', if_not_exists => TRUE, migrate_data => TRUE)"
-                ))
-                logger.info("Hypertable ensured")
-            except Exception as e:
-                logger.warning("Hypertable setup note", detail=str(e))
 
     # Load seed data if countries table is empty
     async with async_session() as db:
