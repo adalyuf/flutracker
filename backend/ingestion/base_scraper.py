@@ -119,34 +119,59 @@ class BaseScraper(ABC):
     async def _deduplicate(
         self, db: AsyncSession, records: list[FluCaseRecord]
     ) -> list[FluCaseRecord]:
-        """Remove records that already exist in the database."""
+        """Remove records that already exist in the database (batch approach)."""
+        if not records:
+            return []
+
+        # Get the time range and unique country/source combos to narrow the query
+        times = {r.time for r in records}
+        country_codes = {r.country_code for r in records}
+        sources = {r.source for r in records}
+        min_time = min(times)
+        max_time = max(times)
+
+        # Fetch all existing keys in one query
+        query = select(
+            FluCase.time,
+            FluCase.country_code,
+            FluCase.source,
+            FluCase.region,
+        ).where(and_(
+            FluCase.time >= min_time,
+            FluCase.time <= max_time,
+            FluCase.country_code.in_(country_codes),
+            FluCase.source.in_(sources),
+        ))
+        result = await db.execute(query)
+        existing = {
+            (row.time, row.country_code, row.source, row.region)
+            for row in result.all()
+        }
+
+        # Filter out duplicates in Python
         unique = []
         for r in records:
-            # Check if this exact data point already exists
-            query = select(FluCase).where(and_(
-                FluCase.time == r.time,
-                FluCase.country_code == r.country_code,
-                FluCase.source == r.source,
-                FluCase.region == r.region if r.region else FluCase.region.is_(None),
-            )).limit(1)
-            result = await db.execute(query)
-            if not result.scalar_one_or_none():
+            key = (r.time, r.country_code, r.source, r.region)
+            if key not in existing:
                 unique.append(r)
         return unique
 
     async def _store(self, db: AsyncSession, records: list[FluCaseRecord]) -> int:
-        """Store records in the database."""
-        for r in records:
-            case = FluCase(
-                time=r.time,
-                country_code=r.country_code,
-                region=r.region,
-                city=r.city,
-                new_cases=r.new_cases,
-                flu_type=r.flu_type,
-                source=r.source,
-            )
-            db.add(case)
+        """Store records in the database in batches."""
+        BATCH_SIZE = 1000
+        for i in range(0, len(records), BATCH_SIZE):
+            batch = records[i:i + BATCH_SIZE]
+            for r in batch:
+                db.add(FluCase(
+                    time=r.time,
+                    country_code=r.country_code,
+                    region=r.region,
+                    city=r.city,
+                    new_cases=r.new_cases,
+                    flu_type=r.flu_type,
+                    source=r.source,
+                ))
+            await db.flush()
         return len(records)
 
     async def _update_last_scraped(self, db: AsyncSession):
