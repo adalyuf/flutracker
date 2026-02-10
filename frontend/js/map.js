@@ -1,17 +1,39 @@
 /**
  * Leaflet map module for FluTracker.
  * Displays choropleth world map with country-level flu data.
+ * Supports state-level choropleth drill-down for US and BR.
  */
 
 const FluMap = {
     map: null,
     geoLayer: null,
     regionLayer: null,
+    stateLayer: null,
     anomalyLayer: null,
     topoData: null,
     countryData: {},
     selectedCountry: null,
     currentMetric: 'cases',
+    stateTopoCache: {},  // countryCode -> topoJSON data
+
+    // State FIPS codes -> state names for US TopoJSON matching
+    _usFipsToName: {
+        '01': 'Alabama', '02': 'Alaska', '04': 'Arizona', '05': 'Arkansas',
+        '06': 'California', '08': 'Colorado', '09': 'Connecticut', '10': 'Delaware',
+        '11': 'District of Columbia', '12': 'Florida', '13': 'Georgia', '15': 'Hawaii',
+        '16': 'Idaho', '17': 'Illinois', '18': 'Indiana', '19': 'Iowa',
+        '20': 'Kansas', '21': 'Kentucky', '22': 'Louisiana', '23': 'Maine',
+        '24': 'Maryland', '25': 'Massachusetts', '26': 'Michigan', '27': 'Minnesota',
+        '28': 'Mississippi', '29': 'Missouri', '30': 'Montana', '31': 'Nebraska',
+        '32': 'Nevada', '33': 'New Hampshire', '34': 'New Jersey', '35': 'New Mexico',
+        '36': 'New York', '37': 'North Carolina', '38': 'North Dakota', '39': 'Ohio',
+        '40': 'Oklahoma', '41': 'Oregon', '42': 'Pennsylvania', '44': 'Rhode Island',
+        '45': 'South Carolina', '46': 'South Dakota', '47': 'Tennessee', '48': 'Texas',
+        '49': 'Utah', '50': 'Vermont', '51': 'Virginia', '53': 'Washington',
+        '54': 'West Virginia', '55': 'Wisconsin', '56': 'Wyoming',
+        '60': 'American Samoa', '66': 'Guam', '69': 'Northern Mariana Islands',
+        '72': 'Puerto Rico', '78': 'Virgin Islands',
+    },
 
     async init() {
         // Initialize Leaflet map
@@ -96,11 +118,18 @@ const FluMap = {
         }
 
         const geoFeatures = topojson.feature(this.topoData, this.topoData.objects.countries);
+        this._fixAntimeridian(geoFeatures);
         const iso3to2 = this._buildIso3to2Map();
+
+        // Resolve a TopoJSON feature ID (numeric or zero-padded string) to ISO2
+        const resolveCode = (feature) => {
+            const id = feature.id;
+            return iso3to2[id] || iso3to2[parseInt(id, 10)] || iso3to2[feature.properties?.name];
+        };
 
         this.geoLayer = L.geoJSON(geoFeatures, {
             style: (feature) => {
-                const code2 = iso3to2[feature.id] || iso3to2[feature.properties?.name];
+                const code2 = resolveCode(feature);
                 const data = code2 ? this.countryData[code2] : null;
                 const value = this._getMetricValue(data);
 
@@ -113,7 +142,7 @@ const FluMap = {
                 };
             },
             onEachFeature: (feature, layer) => {
-                const code2 = iso3to2[feature.id] || iso3to2[feature.properties?.name];
+                const code2 = resolveCode(feature);
                 const data = code2 ? this.countryData[code2] : null;
 
                 if (data) {
@@ -147,7 +176,7 @@ const FluMap = {
     },
 
     /**
-     * Show region-level bubbles when drilling into a country.
+     * Show region-level bubbles when drilling into a country (fallback for countries without state TopoJSON).
      */
     async showRegions(regionData) {
         this.regionLayer.clearLayers();
@@ -173,10 +202,171 @@ const FluMap = {
                     <span class="popup-stat-label">Cases:</span>
                     <span class="popup-stat-value">${Utils.formatNumber(r.total_cases)}</span>
                 </div>
+                ${r.trend_pct != null ? `
+                <div class="popup-stat">
+                    <span class="popup-stat-label">Trend:</span>
+                    <span class="popup-stat-value ${Utils.trendClass(r.trend_pct)}">${Utils.trendArrow(r.trend_pct)} ${Utils.formatTrend(r.trend_pct)}</span>
+                </div>` : ''}
+                ${r.population ? `
+                <div class="popup-stat">
+                    <span class="popup-stat-label">Per 100k:</span>
+                    <span class="popup-stat-value">${(r.total_cases / r.population * 100000).toFixed(1)}</span>
+                </div>` : ''}
             `);
 
             this.regionLayer.addLayer(circle);
         });
+    },
+
+    /**
+     * Show state-level choropleth for countries with state TopoJSON.
+     */
+    async showStateChoropleth(countryCode, regionData) {
+        // Clear previous state/region layers
+        this.regionLayer.clearLayers();
+        if (this.stateLayer) {
+            this.map.removeLayer(this.stateLayer);
+            this.stateLayer = null;
+        }
+
+        if (!regionData || !regionData.regions || regionData.regions.length === 0) return;
+
+        // Load state TopoJSON
+        const topo = await this._loadStateTopoJSON(countryCode);
+        if (!topo) {
+            // Fallback to circle markers
+            this.showRegions(regionData);
+            return;
+        }
+
+        // Build region lookup by name
+        const regionMap = {};
+        regionData.regions.forEach(r => {
+            regionMap[r.region] = r;
+            // Also store lowercase for fuzzy matching
+            regionMap[r.region.toLowerCase()] = r;
+        });
+
+        // Determine max cases for color scale
+        const maxCases = Math.max(...regionData.regions.map(r => r.total_cases), 1);
+        const colorScale = d3.scaleSequential(d3.interpolateYlOrRd)
+            .domain([0, maxCases]);
+
+        // Resolve feature name based on country
+        const getFeatureName = (feature) => {
+            if (countryCode === 'US') {
+                // us-atlas uses FIPS codes as IDs
+                const fips = String(feature.id).padStart(2, '0');
+                return this._usFipsToName[fips] || feature.properties?.name;
+            }
+            // Brazil TopoJSON uses properties.name
+            return feature.properties?.name || feature.properties?.NAME_1;
+        };
+
+        // Create GeoJSON from TopoJSON
+        let geoFeatures;
+        if (countryCode === 'US') {
+            geoFeatures = topojson.feature(topo, topo.objects.states);
+        } else if (countryCode === 'BR') {
+            // Brazil TopoJSON object key
+            const objKey = Object.keys(topo.objects)[0];
+            geoFeatures = topojson.feature(topo, topo.objects[objKey]);
+        } else {
+            return;
+        }
+
+        this.stateLayer = L.geoJSON(geoFeatures, {
+            style: (feature) => {
+                const name = getFeatureName(feature);
+                const r = name ? (regionMap[name] || regionMap[name?.toLowerCase()]) : null;
+                const cases = r ? r.total_cases : 0;
+
+                return {
+                    fillColor: cases > 0 ? colorScale(cases) : '#1a1f2e',
+                    fillOpacity: 0.8,
+                    weight: 1,
+                    color: '#2a3346',
+                    opacity: 0.8,
+                };
+            },
+            onEachFeature: (feature, layer) => {
+                const name = getFeatureName(feature);
+                const r = name ? (regionMap[name] || regionMap[name?.toLowerCase()]) : null;
+
+                const popupContent = `
+                    <div class="popup-country-name">${name || 'Unknown'}</div>
+                    <div class="popup-stat">
+                        <span class="popup-stat-label">Cases:</span>
+                        <span class="popup-stat-value">${r ? Utils.formatNumber(r.total_cases) : '0'}</span>
+                    </div>
+                    ${r?.trend_pct != null ? `
+                    <div class="popup-stat">
+                        <span class="popup-stat-label">Trend:</span>
+                        <span class="popup-stat-value ${Utils.trendClass(r.trend_pct)}">${Utils.trendArrow(r.trend_pct)} ${Utils.formatTrend(r.trend_pct)}</span>
+                    </div>` : ''}
+                    ${r?.population ? `
+                    <div class="popup-stat">
+                        <span class="popup-stat-label">Per 100k:</span>
+                        <span class="popup-stat-value">${(r.total_cases / r.population * 100000).toFixed(1)}</span>
+                    </div>` : ''}
+                `;
+                layer.bindPopup(popupContent);
+
+                layer.on('mouseover', function () {
+                    this.setStyle({ weight: 2, color: '#4a9eff' });
+                    this.bringToFront();
+                });
+                layer.on('mouseout', function () {
+                    this.setStyle({ weight: 1, color: '#2a3346' });
+                });
+            },
+        }).addTo(this.map);
+
+        // Zoom to the state layer bounds
+        const bounds = this.stateLayer.getBounds();
+        if (bounds.isValid()) {
+            this.map.fitBounds(bounds, { padding: [20, 20] });
+        }
+    },
+
+    /**
+     * Clear the state choropleth layer and restore world view.
+     */
+    clearStateChoropleth() {
+        if (this.stateLayer) {
+            this.map.removeLayer(this.stateLayer);
+            this.stateLayer = null;
+        }
+        this.regionLayer.clearLayers();
+    },
+
+    /**
+     * Load state-level TopoJSON for a country (cached).
+     */
+    async _loadStateTopoJSON(countryCode) {
+        if (this.stateTopoCache[countryCode]) {
+            return this.stateTopoCache[countryCode];
+        }
+
+        let url;
+        if (countryCode === 'US') {
+            url = 'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json';
+        } else if (countryCode === 'BR') {
+            url = 'data/brazil-states.json';
+        } else {
+            return null;
+        }
+
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) return null;
+            const data = await resp.json();
+            this.stateTopoCache[countryCode] = data;
+            return data;
+        } catch (e) {
+            console.error(`Failed to load state TopoJSON for ${countryCode}`, e);
+            return null;
+        }
     },
 
     /**
@@ -245,6 +435,41 @@ const FluMap = {
 
     // --- Private helpers ---
 
+    /**
+     * Fix antimeridian artifacts for countries like Russia and Fiji.
+     * For each polygon ring, if consecutive points jump > 180° in longitude,
+     * shift coordinates so the entire ring stays on one side.
+     */
+    _fixAntimeridian(geojson) {
+        const fixRing = (ring) => {
+            for (let i = 1; i < ring.length; i++) {
+                const diff = ring[i][0] - ring[i - 1][0];
+                if (diff > 180) {
+                    ring[i][0] -= 360;
+                } else if (diff < -180) {
+                    ring[i][0] += 360;
+                }
+            }
+        };
+
+        const fixCoords = (geometry) => {
+            if (!geometry) return;
+            if (geometry.type === 'Polygon') {
+                geometry.coordinates.forEach(fixRing);
+            } else if (geometry.type === 'MultiPolygon') {
+                geometry.coordinates.forEach(polygon => {
+                    polygon.forEach(fixRing);
+                });
+            }
+        };
+
+        if (geojson.type === 'FeatureCollection') {
+            geojson.features.forEach(f => fixCoords(f.geometry));
+        } else if (geojson.type === 'Feature') {
+            fixCoords(geojson.geometry);
+        }
+    },
+
     _getMetricValue(data) {
         if (!data) return 0;
         switch (this.currentMetric) {
@@ -278,28 +503,53 @@ const FluMap = {
     },
 
     _buildIso3to2Map() {
-        // Map numeric ISO IDs and ISO3 codes to ISO2
-        // world-atlas uses numeric ISO codes
+        // Complete mapping of ISO 3166-1 numeric codes to ISO2 alpha-2 codes.
+        // world-atlas TopoJSON uses numeric IDs (sometimes zero-padded strings
+        // like "076"), so we index by integer and resolve via _resolveCountryCode().
         const numericToAlpha2 = {
-            4: 'AF', 8: 'AL', 12: 'DZ', 24: 'AO', 32: 'AR', 36: 'AU',
-            40: 'AT', 50: 'BD', 56: 'BE', 204: 'BJ', 68: 'BO', 76: 'BR',
-            854: 'BF', 108: 'BI', 116: 'KH', 120: 'CM', 124: 'CA', 148: 'TD',
-            152: 'CL', 156: 'CN', 170: 'CO', 180: 'CD', 178: 'CG', 384: 'CI',
-            192: 'CU', 203: 'CZ', 208: 'DK', 214: 'DO', 218: 'EC', 818: 'EG',
-            222: 'SV', 231: 'ET', 246: 'FI', 250: 'FR', 276: 'DE', 288: 'GH',
-            300: 'GR', 320: 'GT', 324: 'GN', 332: 'HT', 340: 'HN', 348: 'HU',
-            356: 'IN', 360: 'ID', 364: 'IR', 368: 'IQ', 372: 'IE', 376: 'IL',
-            380: 'IT', 392: 'JP', 400: 'JO', 398: 'KZ', 404: 'KE', 408: 'KP',
-            410: 'KR', 422: 'LB', 434: 'LY', 450: 'MG', 454: 'MW', 458: 'MY',
-            466: 'ML', 484: 'MX', 504: 'MA', 508: 'MZ', 104: 'MM', 524: 'NP',
-            528: 'NL', 554: 'NZ', 562: 'NE', 566: 'NG', 578: 'NO', 586: 'PK',
-            604: 'PE', 608: 'PH', 616: 'PL', 620: 'PT', 642: 'RO', 643: 'RU',
-            646: 'RW', 682: 'SA', 686: 'SN', 688: 'RS', 694: 'SL', 702: 'SG',
-            706: 'SO', 710: 'ZA', 728: 'SS', 724: 'ES', 144: 'LK', 729: 'SD',
-            752: 'SE', 756: 'CH', 760: 'SY', 158: 'TW', 834: 'TZ', 764: 'TH',
-            768: 'TG', 788: 'TN', 792: 'TR', 800: 'UG', 804: 'UA', 784: 'AE',
-            826: 'GB', 840: 'US', 860: 'UZ', 862: 'VE', 704: 'VN', 887: 'YE',
-            894: 'ZM', 716: 'ZW',
+            4: 'AF', 8: 'AL', 10: 'AQ', 12: 'DZ', 16: 'AS', 20: 'AD',
+            24: 'AO', 28: 'AG', 31: 'AZ', 32: 'AR', 36: 'AU', 40: 'AT',
+            44: 'BS', 48: 'BH', 50: 'BD', 51: 'AM', 52: 'BB', 56: 'BE',
+            60: 'BM', 64: 'BT', 68: 'BO', 70: 'BA', 72: 'BW', 76: 'BR',
+            84: 'BZ', 86: 'IO', 90: 'SB', 92: 'VG', 96: 'BN', 100: 'BG',
+            104: 'MM', 108: 'BI', 112: 'BY', 116: 'KH', 120: 'CM', 124: 'CA',
+            132: 'CV', 136: 'KY', 140: 'CF', 144: 'LK', 148: 'TD', 152: 'CL',
+            156: 'CN', 158: 'TW', 162: 'CX', 166: 'CC', 170: 'CO', 174: 'KM',
+            175: 'YT', 178: 'CG', 180: 'CD', 184: 'CK', 188: 'CR', 191: 'HR',
+            192: 'CU', 196: 'CY', 203: 'CZ', 204: 'BJ', 208: 'DK', 212: 'DM',
+            214: 'DO', 218: 'EC', 222: 'SV', 226: 'GQ', 231: 'ET', 232: 'ER',
+            233: 'EE', 234: 'FO', 238: 'FK', 242: 'FJ', 246: 'FI', 248: 'AX',
+            250: 'FR', 254: 'GF', 258: 'PF', 260: 'TF', 262: 'DJ', 266: 'GA',
+            268: 'GE', 270: 'GM', 275: 'PS', 276: 'DE', 288: 'GH', 292: 'GI',
+            296: 'KI', 300: 'GR', 304: 'GL', 308: 'GD', 312: 'GP', 316: 'GU',
+            320: 'GT', 324: 'GN', 328: 'GY', 332: 'HT', 336: 'VA', 340: 'HN',
+            344: 'HK', 348: 'HU', 352: 'IS', 356: 'IN', 360: 'ID', 364: 'IR',
+            368: 'IQ', 372: 'IE', 376: 'IL', 380: 'IT', 384: 'CI', 388: 'JM',
+            392: 'JP', 398: 'KZ', 400: 'JO', 404: 'KE', 408: 'KP', 410: 'KR',
+            414: 'KW', 417: 'KG', 418: 'LA', 422: 'LB', 426: 'LS', 428: 'LV',
+            430: 'LR', 434: 'LY', 438: 'LI', 440: 'LT', 442: 'LU', 446: 'MO',
+            450: 'MG', 454: 'MW', 458: 'MY', 462: 'MV', 466: 'ML', 470: 'MT',
+            474: 'MQ', 478: 'MR', 480: 'MU', 484: 'MX', 492: 'MC', 496: 'MN',
+            498: 'MD', 499: 'ME', 500: 'MS', 504: 'MA', 508: 'MZ', 512: 'OM',
+            516: 'NA', 520: 'NR', 524: 'NP', 528: 'NL', 531: 'CW', 533: 'AW',
+            534: 'SX', 540: 'NC', 548: 'VU', 554: 'NZ', 558: 'NI', 562: 'NE',
+            566: 'NG', 570: 'NU', 574: 'NF', 578: 'NO', 580: 'MP', 581: 'UM',
+            583: 'FM', 584: 'MH', 585: 'PW', 586: 'PK', 591: 'PA', 598: 'PG',
+            600: 'PY', 604: 'PE', 608: 'PH', 612: 'PN', 616: 'PL', 620: 'PT',
+            624: 'GW', 626: 'TL', 630: 'PR', 634: 'QA', 638: 'RE', 642: 'RO',
+            643: 'RU', 646: 'RW', 652: 'BL', 654: 'SH', 659: 'KN', 660: 'AI',
+            662: 'LC', 663: 'MF', 666: 'PM', 670: 'VC', 674: 'SM', 678: 'ST',
+            682: 'SA', 686: 'SN', 688: 'RS', 690: 'SC', 694: 'SL', 702: 'SG',
+            703: 'SK', 704: 'VN', 705: 'SI', 706: 'SO', 710: 'ZA', 716: 'ZW',
+            724: 'ES', 728: 'SS', 729: 'SD', 732: 'EH', 740: 'SR', 744: 'SJ',
+            748: 'SZ', 752: 'SE', 756: 'CH', 760: 'SY', 762: 'TJ', 764: 'TH',
+            768: 'TG', 772: 'TK', 776: 'TO', 780: 'TT', 784: 'AE', 788: 'TN',
+            792: 'TR', 795: 'TM', 796: 'TC', 798: 'TV', 800: 'UG', 804: 'UA',
+            807: 'MK', 818: 'EG', 826: 'GB', 831: 'GG', 832: 'JE', 833: 'IM',
+            834: 'TZ', 840: 'US', 850: 'VI', 854: 'BF', 858: 'UY', 860: 'UZ',
+            862: 'VE', 876: 'WF', 882: 'WS', 887: 'YE', 894: 'ZM',
+            // Kosovo (user-assigned code, used by world-atlas)
+            '-99': 'XK',
         };
         return numericToAlpha2;
     },

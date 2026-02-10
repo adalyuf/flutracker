@@ -1,6 +1,7 @@
 /**
  * Dashboard table module for FluTracker.
  * Renders the sortable/filterable country data table with sparklines.
+ * Supports expandable region sub-rows for countries with state-level data.
  */
 
 const Dashboard = {
@@ -9,6 +10,9 @@ const Dashboard = {
     severityMap: {},
     trendDataCache: {},
     selectedCode: null,
+    countriesWithRegions: new Set(),
+    expandedCountries: {},  // code -> regionData cache
+    expandedSet: new Set(),  // currently expanded codes
 
     init() {
         // Search
@@ -127,11 +131,16 @@ const Dashboard = {
             const per100k = c.population
                 ? ((c.total_recent_cases || 0) / c.population * 100000).toFixed(1)
                 : '—';
+            const hasRegions = this.countriesWithRegions.has(c.code);
+            const isExpanded = this.expandedSet.has(c.code);
+            const chevron = hasRegions
+                ? `<span class="expand-toggle">${isExpanded ? '&#9662;' : '&#9656;'}</span> `
+                : '';
 
-            return `
+            let html = `
                 <tr data-code="${c.code}" class="${c.code === this.selectedCode ? 'selected' : ''}">
                     <td class="col-rank">${idx + 1}</td>
-                    <td class="col-country">${c.name}</td>
+                    <td class="col-country">${chevron}${c.name}</td>
                     <td class="col-cases">${Utils.formatNumber(c.total_recent_cases || 0)}</td>
                     <td class="col-rate">${per100k}</td>
                     <td class="col-trend ${Utils.trendClass(c.trend_pct)}">
@@ -158,12 +167,51 @@ const Dashboard = {
                     </td>
                 </tr>
             `;
+
+            // Render expanded region sub-rows
+            if (isExpanded && this.expandedCountries[c.code]) {
+                const regions = this.expandedCountries[c.code];
+                html += regions.map(r => {
+                    const rPer100k = r.population
+                        ? (r.total_cases / r.population * 100000).toFixed(1)
+                        : '—';
+                    const dominantType = r.flu_types
+                        ? Object.entries(r.flu_types).sort((a, b) => b[1] - a[1])[0]?.[0] || '—'
+                        : '—';
+                    return `
+                        <tr class="region-row" data-country="${c.code}" data-region="${r.region}">
+                            <td class="col-rank"></td>
+                            <td class="col-country region-name">${r.region}</td>
+                            <td class="col-cases">${Utils.formatNumber(r.total_cases)}</td>
+                            <td class="col-rate">${rPer100k}</td>
+                            <td class="col-trend ${r.trend_pct != null ? Utils.trendClass(r.trend_pct) : ''}">
+                                ${r.trend_pct != null ? Utils.trendArrow(r.trend_pct) + ' ' + Utils.formatTrend(r.trend_pct) : '—'}
+                            </td>
+                            <td class="col-sparkline"></td>
+                            <td class="col-severity"></td>
+                            <td class="col-subtypes">${dominantType}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            return html;
         }).join('');
 
-        // Row click handlers
-        tbody.querySelectorAll('tr[data-code]').forEach(row => {
-            row.addEventListener('click', () => {
+        // Row click handlers for country rows
+        tbody.querySelectorAll('tr[data-code]:not(.region-row)').forEach(row => {
+            row.addEventListener('click', (e) => {
                 const code = row.dataset.code;
+
+                // If clicking on expand toggle area (or the chevron itself)
+                if (this.countriesWithRegions.has(code)) {
+                    const toggle = row.querySelector('.expand-toggle');
+                    if (toggle && (e.target === toggle || e.target.closest('.col-country'))) {
+                        this._toggleExpand(code);
+                        return;
+                    }
+                }
+
                 const country = this.filtered.find(c => c.code === code);
                 this.selectedCode = code;
 
@@ -178,6 +226,30 @@ const Dashboard = {
 
         // Draw sparklines
         this._drawSparklines();
+    },
+
+    /**
+     * Toggle expand/collapse for a country's region rows.
+     */
+    async _toggleExpand(code) {
+        if (this.expandedSet.has(code)) {
+            this.expandedSet.delete(code);
+            this.render();
+            return;
+        }
+
+        // Fetch region data if not cached
+        if (!this.expandedCountries[code]) {
+            const data = await API.getCasesByRegion(code);
+            if (data && data.regions) {
+                this.expandedCountries[code] = data.regions;
+            } else {
+                return;
+            }
+        }
+
+        this.expandedSet.add(code);
+        this.render();
     },
 
     /**

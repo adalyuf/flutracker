@@ -1,13 +1,13 @@
-import json
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, distinct
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.database import get_db
 from backend.app.models import FluCase, Country
 from backend.app.schemas import MapFeatureProperties
+from backend.app.country_metadata import COUNTRY_META
 
 router = APIRouter(tags=["map"])
 
@@ -64,30 +64,44 @@ async def get_map_geojson(
             type_max[r.country_code] = r.type_total
             dominant_types[r.country_code] = r.flu_type
 
-    # Get all countries
-    countries_result = await db.execute(select(Country))
-    countries = countries_result.scalars().all()
+    # Get all country codes with data
+    codes_result = await db.execute(select(distinct(FluCase.country_code)))
+    data_codes = {r[0] for r in codes_result.all()}
+
+    # Get DB seed countries for metadata
+    db_result = await db.execute(select(Country))
+    db_countries = {c.code: c for c in db_result.scalars().all()}
 
     features = []
-    for c in countries:
-        cases = current_map.get(c.code, 0)
-        prev = prev_map.get(c.code, 0)
+    for code in sorted(data_codes):
+        # Resolve metadata from DB or static fallback
+        if code in db_countries:
+            c = db_countries[code]
+            name, population = c.name, c.population
+        elif code in COUNTRY_META:
+            m = COUNTRY_META[code]
+            name, population = m["name"], m["population"]
+        else:
+            continue
+
+        cases = current_map.get(code, 0)
+        prev = prev_map.get(code, 0)
         trend = round((cases - prev) / prev * 100, 1) if prev else 0.0
-        per_100k = round(cases / c.population * 100_000, 2) if c.population else None
+        per_100k = round(cases / population * 100_000, 2) if population else None
 
         features.append({
             "type": "Feature",
             "properties": {
-                "country_code": c.code,
-                "country_name": c.name,
+                "country_code": code,
+                "country_name": name,
                 "new_cases_7d": cases,
                 "cases_per_100k": per_100k,
                 "trend_pct": trend,
-                "dominant_flu_type": dominant_types.get(c.code),
+                "dominant_flu_type": dominant_types.get(code),
                 "severity_score": None,  # Filled by severity service
             },
             # Geometry is joined client-side with TopoJSON
-            "id": c.code,
+            "id": code,
         })
 
     return {

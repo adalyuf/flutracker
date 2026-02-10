@@ -7,6 +7,7 @@ const App = {
     refreshInterval: null,
     hemisphereMode: 'calendar',
     cachedData: {},
+    countriesWithRegions: new Set(),
 
     async init() {
         console.log('FluTracker initializing...');
@@ -40,7 +41,13 @@ const App = {
             // Load region data for map drill-down
             const regionData = await API.getCasesByRegion(code);
             if (regionData) {
-                FluMap.showRegions(regionData);
+                // Use state choropleth for countries with state-level TopoJSON (US, BR)
+                if (this.countriesWithRegions.has(code) && (code === 'US' || code === 'BR')) {
+                    FluMap.showStateChoropleth(code, regionData);
+                } else {
+                    FluMap.clearStateChoropleth();
+                    FluMap.showRegions(regionData);
+                }
             }
         });
 
@@ -65,13 +72,21 @@ const App = {
                 severityData,
                 anomalies,
                 summary,
+                withRegions,
             ] = await Promise.all([
                 API.getCountries(),
                 API.getMapGeoJSON(14),
                 API.getSeverity(),
                 API.getAnomalies(7),
                 API.getSummary(),
+                API.getCountriesWithRegions(),
             ]);
+
+            // Track which countries have region data
+            if (withRegions) {
+                this.countriesWithRegions = new Set(withRegions);
+                Dashboard.countriesWithRegions = this.countriesWithRegions;
+            }
 
             // Update each module
             if (countries) {

@@ -28,6 +28,10 @@ const API = {
         return this._fetch('/countries', { continent });
     },
 
+    async getCountriesWithRegions() {
+        return this._fetch('/countries/with-regions');
+    },
+
     async getSummary() {
         return this._fetch('/summary');
     },

@@ -5,7 +5,10 @@
       "Bash(curl:*)",
       "Bash(python:*)",
       "Bash(docker compose up:*)",
-      "Bash(docker compose exec:*)"
+      "Bash(docker compose exec:*)",
+      "WebSearch",
+      "WebFetch(domain:gitlab.fiocruz.br)",
+      "WebFetch(domain:apidadosabertos.saude.gov.br)"
     ]
   }
 }

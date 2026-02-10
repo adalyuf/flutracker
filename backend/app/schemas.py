@@ -37,6 +37,8 @@ class RegionCases(BaseModel):
     flu_types: dict[str, int] = {}
     lat: float | None = None
     lon: float | None = None
+    trend_pct: float | None = None
+    population: int | None = None
 
 
 class CasesByRegionOut(BaseModel):

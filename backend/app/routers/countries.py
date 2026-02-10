@@ -1,14 +1,26 @@
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, distinct
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.database import get_db
 from backend.app.models import Country, FluCase
 from backend.app.schemas import CountryOut, SummaryOut
+from backend.app.country_metadata import COUNTRY_META
 
 router = APIRouter(tags=["countries"])
+
+
+def _country_info(code: str, db_countries: dict[str, Country]) -> dict | None:
+    """Get country metadata from DB seed table, falling back to static mapping."""
+    if code in db_countries:
+        c = db_countries[code]
+        return {"name": c.name, "continent": c.continent, "population": c.population, "last_scraped": c.last_scraped}
+    if code in COUNTRY_META:
+        m = COUNTRY_META[code]
+        return {"name": m["name"], "continent": m["continent"], "population": m["population"], "last_scraped": None}
+    return None
 
 
 @router.get("/countries", response_model=list[CountryOut])
@@ -20,12 +32,13 @@ async def list_countries(
     week_ago = anchor - timedelta(days=7)
     two_weeks_ago = anchor - timedelta(days=14)
 
-    # Get all countries
-    query = select(Country).order_by(Country.name)
-    if continent:
-        query = query.where(Country.continent == continent)
-    result = await db.execute(query)
-    countries = result.scalars().all()
+    # Get all country codes that have data
+    codes_result = await db.execute(select(distinct(FluCase.country_code)))
+    data_codes = {r[0] for r in codes_result.all()}
+
+    # Get DB seed countries for metadata
+    db_result = await db.execute(select(Country))
+    db_countries = {c.code: c for c in db_result.scalars().all()}
 
     # Get 7-day case totals per country
     cases_7d = (
@@ -52,20 +65,35 @@ async def list_countries(
     totals_prev = {r.country_code: r.total for r in result_prev.all()}
 
     out = []
-    for c in countries:
-        recent = totals_7d.get(c.code, 0)
-        prev = totals_prev.get(c.code, 0)
+    for code in sorted(data_codes):
+        info = _country_info(code, db_countries)
+        if not info:
+            continue
+        if continent and info["continent"] != continent:
+            continue
+        recent = totals_7d.get(code, 0)
+        prev = totals_prev.get(code, 0)
         trend = ((recent - prev) / prev * 100) if prev else 0.0
         out.append(CountryOut(
-            code=c.code,
-            name=c.name,
-            population=c.population,
-            continent=c.continent,
-            last_scraped=c.last_scraped,
+            code=code,
+            name=info["name"],
+            population=info["population"],
+            continent=info["continent"],
+            last_scraped=info["last_scraped"],
             total_recent_cases=recent,
             trend_pct=round(trend, 1),
         ))
+    out.sort(key=lambda c: c.name)
     return out
+
+
+@router.get("/countries/with-regions", response_model=list[str])
+async def countries_with_regions(db: AsyncSession = Depends(get_db)):
+    """Return country codes that have region-level data."""
+    result = await db.execute(
+        select(distinct(FluCase.country_code)).where(FluCase.region.isnot(None))
+    )
+    return sorted(r[0] for r in result.all())
 
 
 @router.get("/summary", response_model=SummaryOut)
@@ -76,8 +104,10 @@ async def get_summary(db: AsyncSession = Depends(get_db)):
     four_weeks_ago = anchor - timedelta(days=28)
     two_weeks_ago = anchor - timedelta(days=14)
 
-    # Total countries
-    country_count = await db.execute(select(func.count()).select_from(Country))
+    # Total countries with data
+    country_count = await db.execute(
+        select(func.count(distinct(FluCase.country_code)))
+    )
     total_countries = country_count.scalar() or 0
 
     # 7-day total
@@ -106,17 +136,18 @@ async def get_summary(db: AsyncSession = Depends(get_db)):
     top_result = await db.execute(top_q)
     top_rows = top_result.all()
 
-    # Fetch country details for top countries
+    # Fetch country details for top countries (DB seed table + static fallback)
+    db_result = await db.execute(select(Country))
+    db_countries = {c.code: c for c in db_result.scalars().all()}
     top_countries = []
     for row in top_rows:
-        c = await db.execute(select(Country).where(Country.code == row.country_code))
-        country = c.scalar_one_or_none()
-        if country:
+        info = _country_info(row.country_code, db_countries)
+        if info:
             top_countries.append(CountryOut(
-                code=country.code,
-                name=country.name,
-                population=country.population,
-                continent=country.continent,
+                code=row.country_code,
+                name=info["name"],
+                population=info["population"],
+                continent=info["continent"],
                 total_recent_cases=row.total,
             ))
 

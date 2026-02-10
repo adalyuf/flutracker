@@ -44,10 +44,14 @@ async def get_cases_by_region(
     days: int = Query(7, le=90),
     db: AsyncSession = Depends(get_db),
 ):
-    since = datetime.utcnow() - timedelta(days=days)
     country = country.upper()
 
-    # Aggregate cases by region
+    # Use anchor-date pattern
+    anchor = (await db.execute(select(func.max(FluCase.time)))).scalar() or datetime.utcnow()
+    since = anchor - timedelta(days=days)
+    prev_since = anchor - timedelta(days=days * 2)
+
+    # Aggregate cases by region (current period)
     query = (
         select(
             FluCase.region,
@@ -60,7 +64,24 @@ async def get_cases_by_region(
     result = await db.execute(query)
     rows = result.all()
 
-    # Get region coordinates
+    # Aggregate cases by region (previous period for trend)
+    prev_query = (
+        select(
+            FluCase.region,
+            func.sum(FluCase.new_cases).label("total_cases"),
+        )
+        .where(and_(
+            FluCase.country_code == country,
+            FluCase.time >= prev_since,
+            FluCase.time < since,
+            FluCase.region.isnot(None),
+        ))
+        .group_by(FluCase.region)
+    )
+    prev_result = await db.execute(prev_query)
+    prev_totals = {r.region: r.total_cases for r in prev_result.all()}
+
+    # Get region coordinates and population
     region_query = select(Region).where(Region.country_code == country)
     region_result = await db.execute(region_query)
     region_map = {r.name: r for r in region_result.scalars().all()}
@@ -89,12 +110,16 @@ async def get_cases_by_region(
     regions = []
     for row in rows:
         reg = region_map.get(row.region)
+        prev = prev_totals.get(row.region, 0)
+        trend = round((row.total_cases - prev) / prev * 100, 1) if prev else None
         regions.append(RegionCases(
             region=row.region,
             total_cases=row.total_cases,
             flu_types=type_map.get(row.region, {}),
             lat=reg.lat if reg else None,
             lon=reg.lon if reg else None,
+            trend_pct=trend,
+            population=reg.population if reg else None,
         ))
 
     return CasesByRegionOut(country_code=country, period_days=days, regions=regions)

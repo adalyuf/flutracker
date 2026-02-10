@@ -545,6 +545,35 @@ body {
     font-weight: 500;
 }
 
+/* === Region Sub-rows === */
+.expand-toggle {
+    cursor: pointer;
+    color: var(--accent-blue);
+    font-size: 0.75rem;
+    user-select: none;
+    display: inline-block;
+    width: 14px;
+}
+
+.region-row {
+    background: rgba(26, 31, 46, 0.5);
+}
+
+.region-row:hover {
+    background: var(--bg-hover) !important;
+}
+
+.region-row td {
+    border-bottom: 1px solid rgba(42, 51, 70, 0.3);
+    font-size: 0.8rem;
+}
+
+.region-name {
+    padding-left: 32px !important;
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
 .loading-cell {
     text-align: center;
     padding: 40px;
