@@ -3,3 +3,5 @@ data/
 !frontend/data/
 __pycache__/
 *.pyc
+file::memory:
+.claude/settings.local.json

@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
+from contextlib import asynccontextmanager
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
@@ -13,6 +14,15 @@ from sqlalchemy.pool import NullPool
 from backend.app.database import Base, get_db
 from backend.app.main import app
 from backend.app.models import Country, FluCase, Anomaly
+
+
+# No-op lifespan so TestClient doesn't try to connect to the real DB
+@asynccontextmanager
+async def _noop_lifespan(app):
+    yield
+
+
+app.router.lifespan_context = _noop_lifespan
 
 
 # Use SQLite for tests (in-memory)
@@ -26,9 +36,36 @@ def event_loop():
     loop.close()
 
 
+def _register_sqlite_functions(dbapi_conn, connection_record):
+    """Register PostgreSQL-compatible functions for SQLite."""
+    from datetime import datetime as dt
+
+    def date_trunc(part, value):
+        if value is None:
+            return None
+        if isinstance(value, str):
+            value = dt.fromisoformat(value)
+        if part == "day":
+            return value.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        elif part == "week":
+            # ISO week: Monday-based
+            day_of_week = value.weekday()
+            start = value - timedelta(days=day_of_week)
+            return start.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        elif part == "month":
+            return value.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+        return value.isoformat()
+
+    dbapi_conn.create_function("date_trunc", 2, date_trunc)
+
+
 @pytest_asyncio.fixture(scope="function")
 async def db_engine():
     engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
+
+    from sqlalchemy import event as sa_event
+    sa_event.listen(engine.sync_engine, "connect", _register_sqlite_functions)
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine
@@ -107,3 +144,24 @@ def client(db_session):
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def seeded_client(seeded_db):
+    """FastAPI test client backed by a seeded database."""
+    async def override_get_db():
+        yield seeded_db
+
+    app.dependency_overrides[get_db] = override_get_db
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def clear_cache():
+    """Clear the in-memory cache before each test."""
+    from backend.app import cache
+    cache.invalidate()
+    yield
+    cache.invalidate()

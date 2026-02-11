@@ -24,6 +24,13 @@ def _bucket_expression(granularity: str):
         return func.date_trunc("month", FluCase.time)
 
 
+def _ensure_datetime(value) -> datetime:
+    """Coerce a bucket value to a datetime (handles string from SQLite)."""
+    if isinstance(value, str):
+        return datetime.fromisoformat(value)
+    return value
+
+
 def _season_label(start_year: int) -> str:
     """Return a season label like '2023-24' for the season starting in Oct of start_year."""
     return f"{start_year}-{str(start_year + 1)[-2:]}"
@@ -81,7 +88,8 @@ async def get_historical_seasons(
         s_start_aware = s_start.replace(tzinfo=timezone.utc)
         data = []
         for row in rows:
-            bucket_dt = row.bucket.replace(tzinfo=timezone.utc) if row.bucket.tzinfo is None else row.bucket
+            bucket_dt = _ensure_datetime(row.bucket)
+            bucket_dt = bucket_dt.replace(tzinfo=timezone.utc) if bucket_dt.tzinfo is None else bucket_dt
             week_offset = int((bucket_dt - s_start_aware).days // 7)
             data.append(TrendPoint(
                 date=str(week_offset),
@@ -130,7 +138,7 @@ async def get_trends(
     for row in rows:
         per_100k = round(row.cases / pop * 100_000, 2) if pop else None
         data.append(TrendPoint(
-            date=row.bucket.strftime("%Y-%m-%d"),
+            date=_ensure_datetime(row.bucket).strftime("%Y-%m-%d"),
             cases=row.cases,
             cases_per_100k=per_100k,
         ))
@@ -157,7 +165,7 @@ async def get_global_trends(
     rows = result.all()
 
     data = [
-        TrendPoint(date=row.bucket.strftime("%Y-%m-%d"), cases=row.cases)
+        TrendPoint(date=_ensure_datetime(row.bucket).strftime("%Y-%m-%d"), cases=row.cases)
         for row in rows
     ]
     return TrendOut(country_code=None, granularity=granularity, data=data)
@@ -193,7 +201,7 @@ async def compare_trends(
         pop = pop_map.get(code)
         series[code] = [
             TrendPoint(
-                date=row.bucket.strftime("%Y-%m-%d"),
+                date=_ensure_datetime(row.bucket).strftime("%Y-%m-%d"),
                 cases=row.cases,
                 cases_per_100k=round(row.cases / pop * 100_000, 2) if (normalize and pop) else None,
             )

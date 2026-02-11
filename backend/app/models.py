@@ -37,8 +37,8 @@ class Region(Base):
 class FluCase(Base):
     __tablename__ = "flu_cases"
 
-    time = Column(DateTime(timezone=True), primary_key=True, nullable=False)
     id = Column(Integer, primary_key=True, autoincrement=True)
+    time = Column(DateTime(timezone=True), nullable=False)
     country_code = Column(String(2), nullable=False)
     region = Column(Text)
     city = Column(Text)
