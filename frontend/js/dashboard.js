@@ -65,6 +65,7 @@ const Dashboard = {
     applyFilters() {
         const search = document.getElementById('searchInput').value.toLowerCase();
         const continent = document.getElementById('filterContinent').value;
+        const fluType = document.getElementById('filterFluType').value;
         const sortBy = document.getElementById('sortBy').value;
 
         let data = [...this.countries];
@@ -80,6 +81,15 @@ const Dashboard = {
         // Continent filter
         if (continent) {
             data = data.filter(c => c.continent === continent);
+        }
+
+        // Flu type filter — match against dominant type from severity data
+        if (fluType) {
+            data = data.filter(c => {
+                const sev = this.severityMap[c.code];
+                const dominant = sev?.components?.dominant_type || '';
+                return dominant.toLowerCase().includes(fluType.toLowerCase());
+            });
         }
 
         // Sort
@@ -240,12 +250,23 @@ const Dashboard = {
 
         // Fetch region data if not cached
         if (!this.expandedCountries[code]) {
+            // Show loading row while fetching
+            this.expandedSet.add(code);
+            this.expandedCountries[code] = [{
+                region: 'Loading...', total_cases: 0, flu_types: null,
+                lat: null, lon: null, trend_pct: null, population: null, _loading: true,
+            }];
+            this.render();
+
             const data = await API.getCasesByRegion(code);
             if (data && data.regions) {
                 this.expandedCountries[code] = data.regions;
             } else {
-                return;
+                this.expandedSet.delete(code);
+                delete this.expandedCountries[code];
             }
+            this.render();
+            return;
         }
 
         this.expandedSet.add(code);

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.database import get_db
 from backend.app.models import FluCase, Country
 from backend.app.schemas import SeverityOut
+from backend.app import cache
 
 router = APIRouter(tags=["severity"])
 
@@ -14,6 +15,9 @@ router = APIRouter(tags=["severity"])
 @router.get("/severity", response_model=list[SeverityOut])
 async def get_severity_index(db: AsyncSession = Depends(get_db)):
     """Compute composite severity index for all countries."""
+    cached = cache.get("severity")
+    if cached is not None:
+        return cached
     anchor = (await db.execute(select(func.max(FluCase.time)))).scalar() or datetime.utcnow()
     week_ago = anchor - timedelta(days=7)
     two_weeks_ago = anchor - timedelta(days=14)
@@ -44,8 +48,10 @@ async def get_severity_index(db: AsyncSession = Depends(get_db)):
     for code, country in countries.items():
         current = current_cases.get(code, 0)
         prev = prev_cases.get(code, 0)
-        pop = country.population or 1
+        if not country.population:
+            continue
 
+        pop = country.population
         # Component 1: Cases per 100k (0-100 scale, capped at 100)
         rate_per_100k = current / pop * 100_000
         rate_score = min(rate_per_100k / 50 * 100, 100)  # 50 per 100k = max score
@@ -86,4 +92,5 @@ async def get_severity_index(db: AsyncSession = Depends(get_db)):
         ))
 
     results.sort(key=lambda x: x.score, reverse=True)
+    cache.put("severity", results)
     return results

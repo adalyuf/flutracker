@@ -1,14 +1,23 @@
 # Claude Code Notes
 
 ## Project Overview
-Global influenza surveillance dashboard: FastAPI backend + PostgreSQL/TimescaleDB + vanilla JS/D3/Leaflet frontend, deployed via Docker Compose.
+Global influenza surveillance dashboard: FastAPI backend + PostgreSQL + vanilla JS/D3/Leaflet frontend, deployed on Railway (app + managed Postgres).
 
-## Running Outside Docker
-The `.env` file has `DATABASE_URL` pointing to `@db:5432` (Docker internal hostname). When running scripts locally (outside containers), override with:
-```bash
-DATABASE_URL=$DATABASE_URL/flutracker" python -m <module>
-```
-Port 5432 is mapped to the host in docker-compose.yml.
+## Deployment
+- **Production**: Railway (project `flutracker`, service `pure-heart` + Postgres plugin)
+  - App service builds from `backend/Dockerfile`, FastAPI serves both API and static frontend
+  - Postgres plugin provides `DATABASE_URL` (internal: `postgres.railway.internal:5432`)
+  - Public DB URL uses `interchange.proxy.rlwy.net:24493` (for running backfills locally)
+  - No nginx — FastAPI mounts `frontend/` via `StaticFiles` at `/`
+  - Railway CLI: `railway service pure-heart && railway logs` to check app logs
+- **Local**: `docker compose up` runs postgres:16-alpine + app on port 80
+  - `.env` has `DATABASE_URL` pointing to `@db:5432` (Docker internal hostname)
+  - To run scripts locally against Railway DB, override with public URL:
+    ```bash
+    export DATABASE_URL="postgresql+asyncpg://postgres:PASSWORD@interchange.proxy.rlwy.net:24493/railway"
+    export DATABASE_URL_SYNC="postgresql://postgres:PASSWORD@interchange.proxy.rlwy.net:24493/railway"
+    ```
+- **Config auto-detection**: `config.py` auto-converts plain `postgresql://` URLs (Railway format) to `postgresql+asyncpg://` for the async engine
 
 ## CDC FluView API (Phase 1)
 - **Init endpoint**: `https://gis.cdc.gov/grasp/fluView1/Phase1IniP`
@@ -27,27 +36,29 @@ Port 5432 is mapped to the host in docker-compose.yml.
 - Both endpoints use `_unwrap_cdc_json()` in `usa_cdc.py` to handle the XML wrapping and double-encoding.
 
 ## Backfill Scripts
+All backfills use batch deduplication (single SELECT + Python set lookup) for fast inserts even over network connections. Run against Railway DB by setting `DATABASE_URL` and `DATABASE_URL_SYNC` to the public proxy URL.
+
 - `python -m backend.ingestion.backfill_cdc [--from-year 2010] [--dry-run]`
   - Downloads CDC historical data and stores via the standard scraper pipeline
-  - Deduplication is row-by-row against the DB (time + country_code + source + region), which is slow for large datasets (~40s per 47k records)
-  - Since the download endpoint returns all seasons regardless of season ID requested, only the first season download actually inserts records; the rest are all duplicates.
+  - Since the download endpoint returns all seasons regardless of season ID requested, only the first season download actually inserts records; the rest are all duplicates
+  - Backfill has been run on Railway: 758,128 records (~8 min)
 
 - `python -m backend.ingestion.backfill_flunet [--from-year 2016] [--to-year 2026] [--dry-run]`
   - Downloads WHO FluNet global data year-by-year via xMart OData API
-  - ~112k records for 10 years across ~168 countries
-  - Each year takes ~2s to fetch, ~5-9s to deduplicate & store
-  - Backfill has been run: 2016-2026 data is loaded (109,504 records)
+  - ~88k records for 10 years across ~168 countries
+  - Backfill has been run on Railway: 87,920 records (~3 min). 2026 year fails (no data yet).
 
 - `python -m backend.ingestion.backfill_ukhsa [--from-year 2015] [--to-year 2026] [--regions] [--dry-run]`
   - Downloads UKHSA hospital admission rate data year-by-year
   - ~411 nation-level records for 10 years; `--regions` adds 9 UKHSA regions (slower due to rate limiting)
-  - Backfill has been run: 2015-2026 nation data loaded (411 records)
+  - Backfill has been run on Railway: 411 records
 
 - `python -m backend.ingestion.backfill_brazil [--from-year 2019] [--to-year 2025] [--dry-run]`
   - Downloads SRAG CSV files from OpenDataSUS S3, filters flu-confirmed cases
   - Aggregates by state + epi week + flu type; provides 27-state breakdown for Brazil
   - CSV files are 100-320MB each, streamed row-by-row to avoid memory issues
   - Frozen bank URLs (2019-2024) are hardcoded; current year URL is scraped from the dataset page
+  - Backfill has been run on Railway: ~11k records. CSV streaming is slow for COVID-era years (2020-2021 have 1M+ rows, take ~20-40 min each).
 
 ## Config Gotcha
 `backend/app/config.py` uses pydantic-settings with `extra="ignore"` because the `.env` file contains Docker Compose variables (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`) that aren't declared in the Settings class.
@@ -107,25 +118,32 @@ Port 5432 is mapped to the host in docker-compose.yml.
 - Route registered before `/trends` to avoid FastAPI path conflicts
 
 ## Data Model
-- `flu_cases` is a TimescaleDB hypertable partitioned by `time`
+- `flu_cases` table (plain PostgreSQL, no TimescaleDB) with columns: `time`, `country_code`, `region`, `city`, `new_cases`, `flu_type`, `source`
 - CDC records use: `country_code="US"`, `source="usa_cdc"`, `region=<state name>`, `flu_type=None`
 - `new_cases` for CDC is an estimate mapped from ILI activity level (0-13) since the API provides intensity levels, not raw counts
 - FluNet records use: `country_code=<ISO2>`, `source="who_flunet"`, `region=None`, `flu_type=<subtype>`
 - UKHSA records use: `country_code="GB"`, `source="uk_ukhsa"`, `region=None` or region name
 - Brazil SVS records use: `country_code="BR"`, `source="brazil_svs"`, `region=<state name>`, `flu_type=<subtype>`
-- As of 2026-02-09: ~170k total records (47k CDC + 109k FluNet + 411 UKHSA + 13k Brazil SVS)
+- As of 2026-02-10: ~860k total records on Railway (758k CDC + 88k FluNet + 411 UKHSA + ~11k Brazil SVS)
+
+## State/Province Drill-Down (Completed 2026-02-10)
+- Dashboard table rows for US and BR show expand chevrons (▸/▾) that reveal state-level sub-rows
+- Map shows state-level choropleth when clicking US or BR (TopoJSON loaded on demand)
+- US states: TopoJSON from CDN (`us-atlas@3/states-10m.json`), FIPS code mapping in `map.js`
+- Brazil states: bundled at `frontend/data/brazil-states.json` (~179KB), 27 states with `name` and `sigla` properties
+- Backend: `GET /api/countries/with-regions` returns country codes with region data; `/api/cases/by-region` enhanced with `trend_pct` and `population`
+- Antimeridian fix in `map.js` (`_fixAntimeridian()`) prevents Russia/Fiji from stretching across the map
 
 ## Next Steps
-- **Expand to State/Province Granularity**: Expand the table in dashboard to have state or province level granularity, update map to show this level as well, if available.
+- **Redeploy to Railway**: The batch dedup optimization and TimescaleDB removal have been committed but not yet deployed. Run `railway up` to update the live app.
 - **Fix India NCDC scraper**: Scheduled but likely has a broken endpoint (similar to old FluNet/UKHSA URLs). Test, find working API, rewrite, and backfill.
-- **Brazil SVS backfill done**: 12,972 records (116k flu cases) across 27 states, 2019-2025. Scraper runs on scheduler every 12h. Note: CSV streaming is slow for COVID-era years (2020-2021 have 1M+ rows, take ~10-20 min each). The `fetch_latest()` method downloads the most recent live bank CSV from the dataset page.
 - **Brazil SVS `fetch_latest()` downloads full year**: The scheduled scraper downloads the entire current-year CSV (~300MB) every 12 hours. This is wasteful but unavoidable since OpenDataSUS doesn't offer incremental/date-filtered downloads. Could reduce frequency to weekly (data updates Wednesdays).
 - **UKHSA regional backfill**: The `--regions` flag exists but hasn't been run yet. Would add 9 UKHSA regions but is slow due to rate limiting (~9 * 12 years * 10s = ~18 min).
 - **UKHSA data is low volume**: Only 411 records (nation-level, 1 data point per week). This is because it's admission *rates* converted to estimated counts. Consider also ingesting `influenza_testing_positivityByWeek` (positivity %) as a separate metric if richer UK data is needed.
-- **Deduplication performance**: Row-by-row dedup (`_deduplicate` in `BaseScraper`) is O(n) DB queries. For large backfills, consider batch dedup using `INSERT ... ON CONFLICT DO NOTHING` or a temp table approach.
 - **FluNet `flu_type` aggregation**: The historical-seasons endpoint sums all `flu_type` rows for a country/week. If subtype-level historical charts are desired, the endpoint needs a `flu_type` filter or grouped response.
 - **Southern hemisphere seasons**: The historical-seasons endpoint hardcodes Oct-Sep (NH). Countries like Australia/Brazil have flu seasons ~Apr-Sep. Could add hemisphere-aware season boundaries.
 - **Map/GeoJSON with FluNet data**: The map view likely only shows countries with recent data. With 184 countries now in FluNet, verify the map populates globally and that the time window used for the map is wide enough.
 - **Frontend country selector**: With 184 countries having data, the country dropdown/selector should be populated from countries that actually have data, not just the 94 seeded ones.
 - **GB data overlap**: UKHSA provides England-specific data under `country_code="GB"`, while FluNet also has GB data. The historical-seasons endpoint and trend charts will sum both sources for GB. May want to deduplicate across sources or clearly separate them.
 - **BR data overlap**: Brazil SVS provides state-level data under `country_code="BR"`, while FluNet has country-level BR data (1,165 records). Trend charts for BR will sum both sources. May want to exclude FluNet for BR or clearly separate them.
+- **Database indexing**: With ~860k records, queries may benefit from indexes on `(country_code, time)`, `(country_code, source, time)`, and `(country_code, region, time)` if performance degrades.

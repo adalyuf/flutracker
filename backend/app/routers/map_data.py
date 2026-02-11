@@ -8,6 +8,7 @@ from backend.app.database import get_db
 from backend.app.models import FluCase, Country
 from backend.app.schemas import MapFeatureProperties
 from backend.app.country_metadata import COUNTRY_META
+from backend.app import cache
 
 router = APIRouter(tags=["map"])
 
@@ -18,6 +19,10 @@ async def get_map_geojson(
     db: AsyncSession = Depends(get_db),
 ):
     """Return GeoJSON FeatureCollection with per-country flu stats for map coloring."""
+    cache_key = f"map_geojson:{period}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
     anchor = (await db.execute(select(func.max(FluCase.time)))).scalar() or datetime.utcnow()
     since = anchor - timedelta(days=period)
     prev_since = since - timedelta(days=period)
@@ -104,7 +109,9 @@ async def get_map_geojson(
             "id": code,
         })
 
-    return {
+    result = {
         "type": "FeatureCollection",
         "features": features,
     }
+    cache.put(cache_key, result)
+    return result

@@ -37,7 +37,6 @@ class Region(Base):
 class FluCase(Base):
     __tablename__ = "flu_cases"
 
-    # TimescaleDB requires the partitioning column (time) in the primary key
     time = Column(DateTime(timezone=True), primary_key=True, nullable=False)
     id = Column(Integer, primary_key=True, autoincrement=True)
     country_code = Column(String(2), nullable=False)
@@ -51,6 +50,9 @@ class FluCase(Base):
     __table_args__ = (
         Index("idx_cases_country", "country_code", time.desc()),
         Index("idx_cases_region", "country_code", "region", time.desc()),
+        Index("idx_cases_time", time.desc()),
+        Index("idx_cases_source_time", "source", time.desc()),
+        Index("idx_cases_flu_type", "country_code", "flu_type", time.desc()),
     )
 
 

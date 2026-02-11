@@ -15,9 +15,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Enable TimescaleDB extension
-    op.execute("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE")
-
     # Countries lookup table
     op.create_table(
         "countries",
@@ -56,9 +53,6 @@ def upgrade() -> None:
     )
     op.create_index("idx_cases_country", "flu_cases", ["country_code", sa.text("time DESC")])
     op.create_index("idx_cases_region", "flu_cases", ["country_code", "region", sa.text("time DESC")])
-
-    # Convert to TimescaleDB hypertable
-    op.execute("SELECT create_hypertable('flu_cases', 'time', migrate_data => true)")
 
     # Anomalies table
     op.create_table(

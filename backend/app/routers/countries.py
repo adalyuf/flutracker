@@ -8,6 +8,7 @@ from backend.app.database import get_db
 from backend.app.models import Country, FluCase
 from backend.app.schemas import CountryOut, SummaryOut
 from backend.app.country_metadata import COUNTRY_META
+from backend.app import cache
 
 router = APIRouter(tags=["countries"])
 
@@ -28,6 +29,11 @@ async def list_countries(
     continent: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
+    cache_key = f"countries:{continent or 'all'}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     anchor = (await db.execute(select(func.max(FluCase.time)))).scalar() or datetime.utcnow()
     week_ago = anchor - timedelta(days=7)
     two_weeks_ago = anchor - timedelta(days=14)
@@ -84,20 +90,29 @@ async def list_countries(
             trend_pct=round(trend, 1),
         ))
     out.sort(key=lambda c: c.name)
+    cache.put(cache_key, out)
     return out
 
 
 @router.get("/countries/with-regions", response_model=list[str])
 async def countries_with_regions(db: AsyncSession = Depends(get_db)):
     """Return country codes that have region-level data."""
+    cached = cache.get("countries_with_regions")
+    if cached is not None:
+        return cached
     result = await db.execute(
         select(distinct(FluCase.country_code)).where(FluCase.region.isnot(None))
     )
-    return sorted(r[0] for r in result.all())
+    out = sorted(r[0] for r in result.all())
+    cache.put("countries_with_regions", out, ttl=3600)
+    return out
 
 
 @router.get("/summary", response_model=SummaryOut)
 async def get_summary(db: AsyncSession = Depends(get_db)):
+    cached = cache.get("summary")
+    if cached is not None:
+        return cached
     now = datetime.utcnow()
     anchor = (await db.execute(select(func.max(FluCase.time)))).scalar() or now
     week_ago = anchor - timedelta(days=7)
@@ -170,7 +185,7 @@ async def get_summary(db: AsyncSession = Depends(get_db)):
     )
     active_anomalies = (await db.execute(anomaly_q)).scalar() or 0
 
-    return SummaryOut(
+    result = SummaryOut(
         total_countries_tracked=total_countries,
         total_cases_7d=total_7d,
         total_cases_28d=total_28d,
@@ -180,3 +195,5 @@ async def get_summary(db: AsyncSession = Depends(get_db)):
         dominant_global_flu_type=dominant_type,
         last_updated=now,
     )
+    cache.put("summary", result)
+    return result

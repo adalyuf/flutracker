@@ -140,7 +140,7 @@ def start_scheduler():
 
     scheduler.add_job(
         run_brazil_svs,
-        trigger=CronTrigger(hour="*/12", minute=0),
+        trigger=CronTrigger(day_of_week="wed", hour=6, minute=0),
         id="brazil_svs",
         name="Brazil SVS Scraper",
     )
