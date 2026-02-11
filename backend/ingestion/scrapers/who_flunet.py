@@ -21,19 +21,6 @@ logger = structlog.get_logger()
 FLUNET_API = "https://xmart-api-public.who.int/FLUMART/VIW_FNT"
 
 # Subtype fields in the API response and our standard names
-SUBTYPE_FIELDS = {
-    "AH1N12009": "H1N1",
-    "AH3": "H3N2",
-    "AH5": "H5N1",
-    "AH7N9": "H7N9",
-    "ANOTSUBTYPED": "A (unsubtyped)",
-    "ANOTSUBTYPABLE": "A (unsubtyped)",
-    "INF_A": "A (unsubtyped)",
-    "BYAM": "B/Yamagata",
-    "BVIC": "B/Victoria",
-    "BNOTDETERMINED": "B (lineage unknown)",
-    "INF_B": "B (lineage unknown)",
-}
 
 # Preferred subtype fields in priority order (avoid double-counting).
 # Use specific subtypes first; fall back to aggregate INF_A/INF_B only if
@@ -167,7 +154,7 @@ class WHOFluNetScraper(BaseScraper):
 
         # Last resort: total positive count
         if not records:
-            total_pos = entry.get("INF_ALL") or 0
+            total_pos = entry.get("INF_ALL") or entry.get("ALL_INF") or 0
             if int(total_pos) > 0:
                 records.append(FluCaseRecord(
                     time=week_date,
