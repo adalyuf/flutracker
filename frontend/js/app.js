@@ -18,25 +18,18 @@ const App = {
         Anomalies.init();
         Dashboard.init();
 
-        // Hemisphere toggle
-        document.querySelectorAll('#hemisphereToggle .toggle-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                document.querySelectorAll('#hemisphereToggle .toggle-btn').forEach(b =>
-                    b.classList.remove('active')
-                );
-                e.target.classList.add('active');
-                this.hemisphereMode = e.target.dataset.hemisphere;
-                Charts.refresh();
-            });
-        });
-
         // Listen for country selection from map
         window.addEventListener('countrySelected', async (e) => {
             const { code, name } = e.detail;
-            Charts.currentCountry = code;
-            Dashboard.selectedCode = code;
+            Charts.currentCountry = code || null;
+            Dashboard.selectedCode = code || null;
             Dashboard.render();
             await Charts.refresh();
+
+            if (!code) {
+                FluMap.clearStateChoropleth();
+                return;
+            }
 
             // Load region data for map drill-down
             const regionData = await API.getCasesByRegion(code);

@@ -38,13 +38,6 @@
             </h1>
             <span class="subtitle">Global Influenza Surveillance</span>
         </div>
-        <div class="header-center">
-            <div class="hemisphere-toggle" id="hemisphereToggle">
-                <button class="toggle-btn active" data-hemisphere="calendar">Calendar</button>
-                <button class="toggle-btn" data-hemisphere="northern">N. Hemisphere</button>
-                <button class="toggle-btn" data-hemisphere="southern">S. Hemisphere</button>
-            </div>
-        </div>
         <div class="header-right">
             <span class="live-indicator"><span class="live-dot"></span></span>
             <span class="last-updated" id="lastUpdated">Loading...</span>
@@ -80,12 +73,10 @@
         <!-- Right: Charts -->
         <section class="panel charts-panel">
             <div class="panel-header">
-                <h2 id="chartTitle">Global Trend</h2>
+                <h2 id="chartTitle">Historical Comparison</h2>
                 <div class="chart-controls">
-                    <button class="chart-btn active" data-view="trend">Trend</button>
+                    <button class="chart-btn active" data-view="historical">Historical</button>
                     <button class="chart-btn" data-view="subtype">Subtypes</button>
-                    <button class="chart-btn" data-view="historical">Historical</button>
-                    <button class="chart-btn" data-view="forecast">Forecast</button>
                     <button class="chart-btn" data-view="compare">Compare</button>
                 </div>
             </div>
@@ -171,7 +162,6 @@
     <script src="js/api.js?v=3"></script>
     <script src="js/map.js?v=3"></script>
     <script src="js/charts.js?v=3"></script>
-    <script src="js/forecast.js?v=3"></script>
     <script src="js/anomalies.js?v=3"></script>
     <script src="js/comparison.js?v=3"></script>
     <script src="js/dashboard.js?v=3"></script>

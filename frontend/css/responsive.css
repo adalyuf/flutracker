@@ -13,21 +13,6 @@
         padding: 10px 16px;
     }
 
-    .header-center {
-        order: 3;
-        width: 100%;
-    }
-
-    .hemisphere-toggle {
-        width: 100%;
-        justify-content: center;
-    }
-
-    .toggle-btn {
-        flex: 1;
-        text-align: center;
-    }
-
     .dashboard-panel {
         margin: 0 16px 16px;
     }

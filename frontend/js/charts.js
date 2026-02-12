@@ -8,7 +8,7 @@ const Charts = {
     margin: { top: 20, right: 30, bottom: 40, left: 60 },
     width: 0,
     height: 0,
-    currentView: 'trend',
+    currentView: 'historical',
     currentCountry: null,
     tooltip: null,
 
@@ -53,20 +53,17 @@ const Charts = {
     async refresh() {
         this._updateDimensions();
         switch (this.currentView) {
-            case 'trend':
-                await this.drawTrendline();
-                break;
             case 'subtype':
                 await this.drawSubtypeChart();
                 break;
             case 'historical':
                 await this.drawHistoricalOverlay();
                 break;
-            case 'forecast':
-                await this.drawForecast();
-                break;
             case 'compare':
                 await Comparison.draw();
+                break;
+            default:
+                await this.drawHistoricalOverlay();
                 break;
         }
     },
@@ -261,7 +258,10 @@ const Charts = {
      * Draw historical overlay — current season vs past seasons.
      */
     async drawHistoricalOverlay() {
-        const result = await API.getHistoricalSeasons(this.currentCountry, 5);
+        const [result, forecastResult] = await Promise.all([
+            API.getHistoricalSeasons(this.currentCountry, 5),
+            this.currentCountry ? API.getForecast(this.currentCountry, 4) : Promise.resolve(null),
+        ]);
 
         if (!result || !result.current_season || result.current_season.data.length === 0) {
             this._drawEmpty('No historical data available');
@@ -277,27 +277,77 @@ const Charts = {
             .append('g')
             .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
 
-        const currentData = result.current_season.data;
-        const pastSeasons = result.past_seasons || [];
+        const parseDate = d3.timeParse('%Y-%m-%d');
+        const normalizeSeasonDate = (date) => {
+            const month = date.getMonth();
+            const day = date.getDate();
+            return month >= 9 ? new Date(2000, month, day) : new Date(2001, month, day);
+        };
+        const parseHistoricalPointDate = (rawDate) => {
+            if (rawDate == null) return null;
 
-        // Find max week index across all seasons for x domain
-        let maxWeek = 0;
-        const allSeasons = [currentData, ...pastSeasons.map(s => s.data)];
-        allSeasons.forEach(s => {
-            s.forEach(d => {
-                const w = parseInt(d.date);
-                if (w > maxWeek) maxWeek = w;
-            });
-        });
+            // Preferred API shape: YYYY-MM-DD
+            const parsed = parseDate(rawDate);
+            if (parsed) return normalizeSeasonDate(parsed);
 
-        const x = d3.scaleLinear()
-            .domain([0, Math.max(maxWeek, 51)])
+            // Accept full ISO datetime strings as fallback.
+            const iso = new Date(rawDate);
+            if (!Number.isNaN(iso.getTime())) return normalizeSeasonDate(iso);
+
+            // Backward compatibility: legacy week-offset index ("0", "1", ...).
+            const weekOffset = Number.parseInt(rawDate, 10);
+            if (Number.isFinite(weekOffset)) return new Date(2000, 9, 1 + weekOffset * 7);
+
+            return null;
+        };
+        const mapSeasonData = (season) => season.data
+            .map(d => {
+                const seasonDate = parseHistoricalPointDate(d.date);
+                if (!seasonDate) return null;
+                return {
+                    ...d,
+                    seasonDate,
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.seasonDate - b.seasonDate);
+
+        const currentData = mapSeasonData(result.current_season);
+        const pastSeasons = (result.past_seasons || [])
+            .map(s => ({ ...s, data: mapSeasonData(s) }));
+        const forecastData = (forecastResult && forecastResult.data ? forecastResult.data : [])
+            .map(d => {
+                const seasonDate = parseHistoricalPointDate(d.date);
+                if (!seasonDate) return null;
+                return {
+                    cases: d.predicted_cases,
+                    upper95: d.upper_95,
+                    seasonDate,
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.seasonDate - b.seasonDate);
+        const allSeasons = [currentData, ...pastSeasons.map(s => s.data)].filter(s => s.length > 0);
+
+        if (allSeasons.length === 0 || currentData.length === 0) {
+            this._drawEmpty('No historical data available');
+            return;
+        }
+
+        const seasonStart = new Date(2000, 9, 1); // Oct 1
+        const seasonEnd = new Date(2001, 8, 30); // Sep 30
+        const x = d3.scaleTime()
+            .domain([seasonStart, seasonEnd])
             .range([0, this.width]);
 
         // Find max cases across all seasons for y domain
         let maxCases = 0;
         allSeasons.forEach(s => {
             s.forEach(d => { if (d.cases > maxCases) maxCases = d.cases; });
+        });
+        forecastData.forEach(d => {
+            const ceiling = d.upper95 != null ? d.upper95 : d.cases;
+            if (ceiling > maxCases) maxCases = ceiling;
         });
 
         const y = d3.scaleLinear()
@@ -311,33 +361,37 @@ const Charts = {
             .call(d3.axisLeft(y).tickSize(-this.width).tickFormat(''));
 
         const line = d3.line()
-            .x(d => x(parseInt(d.date)))
+            .x(d => x(d.seasonDate))
             .y(d => y(d.cases))
             .curve(d3.curveMonotoneX);
 
         // Historical range band (min/max across past seasons)
         if (pastSeasons.length > 0) {
-            // Build a map of week -> [cases values] across past seasons
-            const weekMap = {};
+            // Build a map of normalized season date -> [cases values] across past seasons.
+            const dateMap = {};
             pastSeasons.forEach(s => {
                 s.data.forEach(d => {
-                    const w = parseInt(d.date);
-                    if (!weekMap[w]) weekMap[w] = [];
-                    weekMap[w].push(d.cases);
+                    const key = d3.timeFormat('%m-%d')(d.seasonDate);
+                    if (!dateMap[key]) {
+                        dateMap[key] = {
+                            seasonDate: d.seasonDate,
+                            values: [],
+                        };
+                    }
+                    dateMap[key].values.push(d.cases);
                 });
             });
 
-            const bandData = Object.keys(weekMap)
-                .map(Number)
-                .sort((a, b) => a - b)
-                .map(w => ({
-                    week: w,
-                    min: d3.min(weekMap[w]),
-                    max: d3.max(weekMap[w]),
+            const bandData = Object.values(dateMap)
+                .sort((a, b) => a.seasonDate - b.seasonDate)
+                .map(d => ({
+                    seasonDate: d.seasonDate,
+                    min: d3.min(d.values),
+                    max: d3.max(d.values),
                 }));
 
             const area = d3.area()
-                .x(d => x(d.week))
+                .x(d => x(d.seasonDate))
                 .y0(d => y(d.min))
                 .y1(d => y(d.max))
                 .curve(d3.curveMonotoneX);
@@ -378,6 +432,18 @@ const Charts = {
                 .attr('stroke-dashoffset', 0);
         }
 
+        // Forecast extension (dotted line) for selected country.
+        if (currentData.length > 0 && forecastData.length > 0) {
+            const lastCurrentDate = currentData[currentData.length - 1].seasonDate;
+            const futureForecast = forecastData.filter(d => d.seasonDate > lastCurrentDate);
+            if (futureForecast.length > 0) {
+                g.append('path')
+                    .datum([currentData[currentData.length - 1], ...futureForecast])
+                    .attr('class', 'forecast-line')
+                    .attr('d', line);
+            }
+        }
+
         // Legend
         const legendData = [
             { label: result.current_season.label, color: '#00d4aa', dash: '' },
@@ -387,6 +453,9 @@ const Charts = {
                 dash: '4 2',
             })),
         ];
+        if (currentData.length > 0 && forecastData.length > 0) {
+            legendData.push({ label: 'Forecast', color: '#00d4aa', dash: '8 4' });
+        }
         const legend = g.append('g')
             .attr('transform', `translate(${this.width - 160}, 5)`);
 
@@ -407,9 +476,8 @@ const Charts = {
             .attr('class', 'axis')
             .attr('transform', `translate(0,${this.height})`)
             .call(d3.axisBottom(x)
-                .tickValues([0, 4, 8, 13, 17, 21, 26, 30, 34, 39, 43, 47, 51]
-                    .filter(w => w <= Math.max(maxWeek, 51)))
-                .tickFormat(i => `W${i + 1}`));
+                .ticks(d3.timeMonth.every(1))
+                .tickFormat(d3.timeFormat('%b')));
 
         g.append('g')
             .attr('class', 'axis')

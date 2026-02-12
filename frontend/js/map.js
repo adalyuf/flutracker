@@ -167,6 +167,15 @@ const FluMap = {
      * Select a country — zoom in and trigger chart/table updates.
      */
     selectCountry(code, name) {
+        // Clicking the selected country again clears selection.
+        if (this.selectedCountry === code) {
+            this.selectedCountry = null;
+            window.dispatchEvent(new CustomEvent('countrySelected', {
+                detail: { code: null, name: null, cleared: true },
+            }));
+            return;
+        }
+
         this.selectedCountry = code;
 
         // Dispatch custom event for other modules

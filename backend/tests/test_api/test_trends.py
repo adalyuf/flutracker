@@ -65,3 +65,5 @@ def test_historical_seasons(seeded_client):
     assert "current_season" in data
     assert "past_seasons" in data
     assert len(data["past_seasons"]) <= 2
+    for pt in data["current_season"]["data"]:
+        datetime.strptime(pt["date"], "%Y-%m-%d")

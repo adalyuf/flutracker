@@ -224,11 +224,6 @@ const Dashboard = {
                 }
 
                 const country = this.filtered.find(c => c.code === code);
-                this.selectedCode = code;
-
-                // Highlight selected row
-                tbody.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
-                row.classList.add('selected');
 
                 // Trigger country selection
                 FluMap.selectCountry(code, country?.name || code);

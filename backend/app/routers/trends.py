@@ -41,12 +41,13 @@ def _season_boundaries(reference_date: datetime) -> tuple[datetime, datetime]:
 
     Flu season: Oct 1 → Sep 30.
     """
+    tz = reference_date.tzinfo
     if reference_date.month >= 10:
-        start = datetime(reference_date.year, 10, 1)
-        end = datetime(reference_date.year + 1, 9, 30, 23, 59, 59)
+        start = datetime(reference_date.year, 10, 1, tzinfo=tz)
+        end = datetime(reference_date.year + 1, 9, 30, 23, 59, 59, tzinfo=tz)
     else:
-        start = datetime(reference_date.year - 1, 10, 1)
-        end = datetime(reference_date.year, 9, 30, 23, 59, 59)
+        start = datetime(reference_date.year - 1, 10, 1, tzinfo=tz)
+        end = datetime(reference_date.year, 9, 30, 23, 59, 59, tzinfo=tz)
     return start, end
 
 
@@ -56,16 +57,17 @@ async def get_historical_seasons(
     seasons: int = Query(5, ge=1, le=10),
     db: AsyncSession = Depends(get_db),
 ):
-    """Return current + past flu seasons with weekly case data."""
-    now = (await db.execute(select(func.max(FluCase.time)))).scalar() or datetime.utcnow()
-    current_start, current_end = _season_boundaries(now)
+    """Return current + past flu seasons with weekly case data on calendar dates."""
+    now = (await db.execute(select(func.max(FluCase.time)))).scalar() or datetime.now(timezone.utc)
+    now = now.replace(tzinfo=timezone.utc) if now.tzinfo is None else now.astimezone(timezone.utc)
+    current_start, _ = _season_boundaries(now)
     country_upper = country.upper() if country else None
 
     all_seasons: list[SeasonData] = []
 
     for i in range(seasons + 1):  # 0 = current season, 1..N = past
-        s_start = datetime(current_start.year - i, 10, 1)
-        s_end = datetime(current_start.year - i + 1, 9, 30, 23, 59, 59)
+        s_start = datetime(current_start.year - i, 10, 1, tzinfo=timezone.utc)
+        s_end = datetime(current_start.year - i + 1, 9, 30, 23, 59, 59, tzinfo=timezone.utc)
         # Clamp future end to now
         if s_end > now:
             s_end = now
@@ -84,15 +86,11 @@ async def get_historical_seasons(
         result = await db.execute(query)
         rows = result.all()
 
-        # Convert to week-of-season index (week 0 = first week of Oct)
-        s_start_aware = s_start.replace(tzinfo=timezone.utc)
         data = []
         for row in rows:
             bucket_dt = _ensure_datetime(row.bucket)
-            bucket_dt = bucket_dt.replace(tzinfo=timezone.utc) if bucket_dt.tzinfo is None else bucket_dt
-            week_offset = int((bucket_dt - s_start_aware).days // 7)
             data.append(TrendPoint(
-                date=str(week_offset),
+                date=bucket_dt.strftime("%Y-%m-%d"),
                 cases=row.cases,
             ))
 

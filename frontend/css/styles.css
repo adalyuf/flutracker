@@ -85,37 +85,6 @@ body {
     font-size: 0.85rem;
 }
 
-.hemisphere-toggle {
-    display: flex;
-    background: var(--bg-panel);
-    border-radius: var(--radius);
-    overflow: hidden;
-    border: 1px solid var(--border-color);
-}
-
-.toggle-btn {
-    padding: 6px 14px;
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    font-size: 0.8rem;
-    font-family: var(--font-sans);
-    font-weight: 500;
-    transition: all 0.2s;
-}
-
-.toggle-btn:hover {
-    color: var(--text-primary);
-    background: var(--bg-hover);
-}
-
-.toggle-btn.active {
-    background: var(--accent-amber);
-    color: #1a1f2e;
-    font-weight: 600;
-}
-
 .header-right {
     display: flex;
     align-items: center;
