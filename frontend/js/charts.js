@@ -126,7 +126,12 @@ const Charts = {
         g.append('path')
             .datum(points)
             .attr('class', 'trend-area')
-            .attr('d', area);
+            .attr('d', area)
+            .style('opacity', 0)
+            .transition()
+            .duration(800)
+            .delay(400)
+            .style('opacity', 0.1);
 
         // Line
         const line = d3.line()
@@ -134,22 +139,38 @@ const Charts = {
             .y(d => y(d.cases))
             .curve(d3.curveMonotoneX);
 
-        g.append('path')
+        const trendPath = g.append('path')
             .datum(points)
             .attr('class', 'trend-line')
             .attr('d', line);
 
+        // Draw-in animation
+        const totalLength = trendPath.node().getTotalLength();
+        trendPath
+            .attr('stroke-dasharray', totalLength)
+            .attr('stroke-dashoffset', totalLength)
+            .transition()
+            .duration(1200)
+            .ease(d3.easeCubicOut)
+            .attr('stroke-dashoffset', 0);
+
         // Dots
-        g.selectAll('.dot')
+        const dots = g.selectAll('.dot')
             .data(points)
             .join('circle')
             .attr('cx', d => x(d.date))
             .attr('cy', d => y(d.cases))
-            .attr('r', 4)
+            .attr('r', 0)
             .attr('fill', '#00d4aa')
             .attr('stroke', '#1e2538')
-            .attr('stroke-width', 2)
-            .on('mouseover', (event, d) => {
+            .attr('stroke-width', 2);
+
+        dots.transition()
+            .duration(300)
+            .delay((d, i) => 800 + i * 30)
+            .attr('r', 4);
+
+        dots.on('mouseover', (event, d) => {
                 this.tooltip
                     .style('display', 'block')
                     .html(`
@@ -209,9 +230,14 @@ const Charts = {
             .attr('y', d => y(d.flu_type))
             .attr('x', 0)
             .attr('height', y.bandwidth())
-            .attr('width', d => x(d.percentage))
+            .attr('width', 0)
             .attr('fill', d => Utils.fluTypeColor(d.flu_type))
-            .attr('rx', 3);
+            .attr('rx', 3)
+            .transition()
+            .duration(600)
+            .delay((d, i) => i * 80)
+            .ease(d3.easeCubicOut)
+            .attr('width', d => x(d.percentage));
 
         // Labels
         g.selectAll('.bar-label')
@@ -337,10 +363,19 @@ const Charts = {
 
         // Current season (bold line)
         if (currentData.length > 0) {
-            g.append('path')
+            const currentPath = g.append('path')
                 .datum(currentData)
                 .attr('class', 'trend-line')
                 .attr('d', line);
+
+            const currentLen = currentPath.node().getTotalLength();
+            currentPath
+                .attr('stroke-dasharray', currentLen)
+                .attr('stroke-dashoffset', currentLen)
+                .transition()
+                .duration(1200)
+                .ease(d3.easeCubicOut)
+                .attr('stroke-dashoffset', 0);
         }
 
         // Legend

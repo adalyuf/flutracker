@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: flutracker
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: flutracker
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flutracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      - ..:/workspace:cached
+    environment:
+      DATABASE_URL: postgresql+asyncpg://flutracker:devpassword@db:5432/flutracker
+      DATABASE_URL_SYNC: postgresql://flutracker:devpassword@db:5432/flutracker
+      APP_ENV: development
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
+      LOG_LEVEL: debug
+      SCRAPE_ENABLED: "false"
+      CACHE_TTL: "60"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sleep infinity
+
+volumes:
+  pgdata:

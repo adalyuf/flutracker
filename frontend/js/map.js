@@ -149,7 +149,7 @@ const FluMap = {
                     layer.bindPopup(this._createPopup(data));
 
                     layer.on('mouseover', function () {
-                        this.setStyle({ weight: 2, color: '#4a9eff' });
+                        this.setStyle({ weight: 2, color: '#F5A623' });
                         this.bringToFront();
                     });
                     layer.on('mouseout', function () {

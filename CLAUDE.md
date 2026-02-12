@@ -136,7 +136,7 @@ All backfills use batch deduplication (single SELECT + Python set lookup) for fa
 
 ## Next Steps
 - **Redeploy to Railway**: The batch dedup optimization and TimescaleDB removal have been committed but not yet deployed. Run `railway up` to update the live app.
-- **Fix India NCDC scraper**: Scheduled but likely has a broken endpoint (similar to old FluNet/UKHSA URLs). Test, find working API, rewrite, and backfill.
+- **India data**: Covered by WHO FluNet (country-level). India has no public flu surveillance API (NCDC/IDSP data is login-gated or PDF-only), so the dedicated India scraper was removed.
 - **Brazil SVS `fetch_latest()` downloads full year**: The scheduled scraper downloads the entire current-year CSV (~300MB) every 12 hours. This is wasteful but unavoidable since OpenDataSUS doesn't offer incremental/date-filtered downloads. Could reduce frequency to weekly (data updates Wednesdays).
 - **UKHSA regional backfill**: The `--regions` flag exists but hasn't been run yet. Would add 9 UKHSA regions but is slow due to rate limiting (~9 * 12 years * 10s = ~18 min).
 - **UKHSA data is low volume**: Only 411 records (nation-level, 1 data point per week). This is because it's admission *rates* converted to estimated counts. Consider also ingesting `influenza_testing_positivityByWeek` (positivity %) as a separate metric if richer UK data is needed.

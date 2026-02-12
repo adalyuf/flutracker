@@ -165,6 +165,7 @@ const Dashboard = {
                                 <div class="severity-fill" style="
                                     width: ${severityScore}%;
                                     background: ${Utils.severityScoreColor(severityScore)};
+                                    box-shadow: 0 0 6px ${Utils.severityScoreColor(severityScore)};
                                 "></div>
                             </div>
                             <span class="severity-label" style="color: ${Utils.severityColor(severityLevel)}">
@@ -307,6 +308,19 @@ const Dashboard = {
             const last = data[data.length - 1];
             const prev = data[data.length - 2];
             const color = last > prev * 1.05 ? '#ff4444' : last < prev * 0.95 ? '#00c853' : '#4a9eff';
+
+            // Area fill beneath sparkline
+            const area = d3.area()
+                .x((d, i) => x(i))
+                .y0(h)
+                .y1(d => y(d))
+                .curve(d3.curveMonotoneX);
+
+            svg.append('path')
+                .datum(data)
+                .attr('d', area)
+                .attr('fill', color)
+                .attr('opacity', 0.15);
 
             svg.append('path')
                 .datum(data)

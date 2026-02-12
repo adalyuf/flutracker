@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FluTracker — Global Influenza Surveillance</title>
 
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
@@ -16,7 +21,21 @@
     <!-- Header -->
     <header class="header">
         <div class="header-left">
-            <h1 class="logo">FluTracker</h1>
+            <h1 class="logo">
+                <svg class="logo-icon" width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5" opacity="0.5"/>
+                    <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.5"/>
+                    <line x1="12" y1="2" x2="12" y2="7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <line x1="12" y1="17" x2="12" y2="22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <line x1="2" y1="12" x2="7" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <line x1="17" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <line x1="4.93" y1="4.93" x2="8.17" y2="8.17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <line x1="15.83" y1="15.83" x2="19.07" y2="19.07" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <line x1="4.93" y1="19.07" x2="8.17" y2="15.83" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <line x1="15.83" y1="8.17" x2="19.07" y2="4.93" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                FluTracker
+            </h1>
             <span class="subtitle">Global Influenza Surveillance</span>
         </div>
         <div class="header-center">
@@ -27,6 +46,7 @@
             </div>
         </div>
         <div class="header-right">
+            <span class="live-indicator"><span class="live-dot"></span></span>
             <span class="last-updated" id="lastUpdated">Loading...</span>
         </div>
     </header>

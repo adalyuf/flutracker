@@ -61,21 +61,6 @@ async def run_uk_ukhsa():
             await scraper.close()
 
 
-async def run_india_ncdc():
-    """Run India NCDC scraper."""
-    from backend.ingestion.scrapers.india_ncdc import IndiaNCScraper
-
-    async with async_session() as db:
-        scraper = IndiaNCScraper()
-        try:
-            count = await scraper.run(db)
-            logger.info("India NCDC scrape complete", records=count)
-        except Exception as e:
-            logger.error("India NCDC scrape failed", error=str(e))
-        finally:
-            await scraper.close()
-
-
 async def run_brazil_svs():
     """Run Brazil SVS scraper."""
     from backend.ingestion.scrapers.brazil_svs import BrazilSVSScraper
@@ -129,13 +114,6 @@ def start_scheduler():
         trigger=CronTrigger(hour="*/6", minute=30),
         id="uk_ukhsa",
         name="UK UKHSA Scraper",
-    )
-
-    scheduler.add_job(
-        run_india_ncdc,
-        trigger=CronTrigger(hour="*/12", minute=45),
-        id="india_ncdc",
-        name="India NCDC Scraper",
     )
 
     scheduler.add_job(
