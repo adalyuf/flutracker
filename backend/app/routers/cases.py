@@ -132,7 +132,8 @@ async def get_cases_by_city(
     days: int = Query(7, le=90),
     db: AsyncSession = Depends(get_db),
 ):
-    since = datetime.utcnow() - timedelta(days=days)
+    anchor = (await db.execute(select(func.max(FluCase.time)))).scalar() or datetime.utcnow()
+    since = anchor - timedelta(days=days)
     query = (
         select(FluCase)
         .where(and_(
@@ -153,7 +154,8 @@ async def get_flu_types(
     days: int = Query(28, le=365),
     db: AsyncSession = Depends(get_db),
 ):
-    since = datetime.utcnow() - timedelta(days=days)
+    anchor = (await db.execute(select(func.max(FluCase.time)))).scalar() or datetime.utcnow()
+    since = anchor - timedelta(days=days)
     query = (
         select(
             FluCase.flu_type,

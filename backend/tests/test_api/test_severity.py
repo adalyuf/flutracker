@@ -27,6 +27,7 @@ def test_severity_score_components(seeded_client):
         assert "rate_score" in entry["components"]
         assert "growth_pct" in entry["components"]
         assert "growth_score" in entry["components"]
+        assert "dominant_type" in entry["components"]
         assert entry["level"] in ("low", "moderate", "high", "very_high", "critical")
 
 

@@ -19,7 +19,8 @@ async def get_forecast(
     db: AsyncSession = Depends(get_db),
 ):
     country = country.upper()
-    since = datetime.utcnow() - timedelta(weeks=52)
+    anchor = (await db.execute(select(func.max(FluCase.time)))).scalar() or datetime.utcnow()
+    since = anchor - timedelta(weeks=52)
 
     # Get weekly case data for the past year
     query = (

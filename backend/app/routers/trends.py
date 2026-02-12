@@ -57,7 +57,7 @@ async def get_historical_seasons(
     db: AsyncSession = Depends(get_db),
 ):
     """Return current + past flu seasons with weekly case data."""
-    now = datetime.utcnow()
+    now = (await db.execute(select(func.max(FluCase.time)))).scalar() or datetime.utcnow()
     current_start, current_end = _season_boundaries(now)
     country_upper = country.upper() if country else None
 
@@ -117,7 +117,8 @@ async def get_trends(
     db: AsyncSession = Depends(get_db),
 ):
     country = country.upper()
-    since = datetime.utcnow() - timedelta(weeks=weeks)
+    anchor = (await db.execute(select(func.max(FluCase.time)))).scalar() or datetime.utcnow()
+    since = anchor - timedelta(weeks=weeks)
     bucket = _bucket_expression(granularity)
 
     # Get population for per-100k calculation
@@ -152,7 +153,8 @@ async def get_global_trends(
     weeks: int = Query(12, le=104),
     db: AsyncSession = Depends(get_db),
 ):
-    since = datetime.utcnow() - timedelta(weeks=weeks)
+    anchor = (await db.execute(select(func.max(FluCase.time)))).scalar() or datetime.utcnow()
+    since = anchor - timedelta(weeks=weeks)
     bucket = _bucket_expression(granularity)
 
     query = (
@@ -180,7 +182,8 @@ async def compare_trends(
     db: AsyncSession = Depends(get_db),
 ):
     codes = [c.strip().upper() for c in countries.split(",")][:5]
-    since = datetime.utcnow() - timedelta(weeks=weeks)
+    anchor = (await db.execute(select(func.max(FluCase.time)))).scalar() or datetime.utcnow()
+    since = anchor - timedelta(weeks=weeks)
     bucket = _bucket_expression(granularity)
 
     # Get populations

@@ -18,7 +18,8 @@ async def get_anomalies(
     days: int = Query(7, le=30),
     db: AsyncSession = Depends(get_db),
 ):
-    since = datetime.utcnow() - timedelta(days=days)
+    anchor = (await db.execute(select(func.max(Anomaly.detected_at)))).scalar() or datetime.utcnow()
+    since = anchor - timedelta(days=days)
     query = (
         select(Anomaly)
         .where(Anomaly.detected_at >= since)

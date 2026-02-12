@@ -44,6 +44,24 @@ async def get_severity_index(db: AsyncSession = Depends(get_db)):
     prev_result = await db.execute(prev_q)
     prev_cases = {r.country_code: r.total for r in prev_result.all()}
 
+    # Dominant flu type in the current week per country
+    type_q = (
+        select(
+            FluCase.country_code,
+            FluCase.flu_type,
+            func.sum(FluCase.new_cases).label("type_total"),
+        )
+        .where(and_(FluCase.time >= week_ago, FluCase.flu_type.isnot(None)))
+        .group_by(FluCase.country_code, FluCase.flu_type)
+    )
+    type_result = await db.execute(type_q)
+    dominant_types: dict[str, str] = {}
+    type_max: dict[str, int] = {}
+    for row in type_result.all():
+        if row.country_code not in type_max or row.type_total > type_max[row.country_code]:
+            type_max[row.country_code] = row.type_total
+            dominant_types[row.country_code] = row.flu_type
+
     results = []
     for code, country in countries.items():
         current = current_cases.get(code, 0)
@@ -87,6 +105,7 @@ async def get_severity_index(db: AsyncSession = Depends(get_db)):
                 "rate_score": round(rate_score, 1),
                 "growth_pct": round(growth * 100, 1) if prev > 0 else 0,
                 "growth_score": round(growth_score, 1),
+                "dominant_type": dominant_types.get(code),
             },
             level=level,
         ))

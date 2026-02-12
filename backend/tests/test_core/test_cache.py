@@ -48,7 +48,8 @@ def test_invalidate_prefix():
 
 def test_default_ttl_from_settings():
     """put() without explicit TTL uses settings.cache_ttl (900s)."""
-    with patch("backend.app.cache.time") as mock_time:
+    with patch("backend.app.cache.time") as mock_time, patch("backend.app.cache.get_settings") as mock_settings:
+        mock_settings.return_value.cache_ttl = 900
         mock_time.monotonic.return_value = 0.0
         cache.put("default_ttl", "val")
 
