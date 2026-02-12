@@ -134,8 +134,24 @@ All backfills use batch deduplication (single SELECT + Python set lookup) for fa
 - Backend: `GET /api/countries/with-regions` returns country codes with region data; `/api/cases/by-region` enhanced with `trend_pct` and `population`
 - Antimeridian fix in `map.js` (`_fixAntimeridian()`) prevents Russia/Fiji from stretching across the map
 
+## Frontend Design Overhaul (Completed 2026-02-12)
+- **Typography**: DM Sans (body/headings) + JetBrains Mono (data/mono) via Google Fonts, replacing system font stack
+- **Color hierarchy**: Amber/gold (`#F5A623`) as dominant brand accent; cyan reserved for data/health signals; blue demoted to secondary. Semantic roles: amber=interactive, cyan=data, red=danger, green=healthy
+- **Header**: SVG virus/crosshair logo icon, live green pulse dot next to "Updated" timestamp, subtle top-to-bottom gradient background
+- **Table**: staggered row fade-in animation (first 20 rows), alternating row backgrounds, wider severity bars (80px) with colored glow, sparkline area fills beneath lines
+- **Chart animations**: trend line draws in left-to-right via `stroke-dashoffset` (1.2s), area fades in after 400ms delay, data dots cascade in sequentially, subtype bars grow from zero width, historical overlay current-season line animates in
+- **Map**: CSS inward box-shadow vignette on `.map-container::after`, amber hover borders on countries, refined popup styling (deeper shadow + border), legend bar with dark tinted background
+- **Controls**: all `<select>` elements use custom SVG chevron arrow (`appearance: none`), consistent 32px height across all inputs/selects, amber hover/focus states with subtle ring glow on search input, chart tabs redesigned with bottom-border accent instead of solid fill
+- **Fonts loaded via**: `<link>` tags with `preconnect` to Google Fonts in `index.html`
+
+## Devcontainer Setup (Added 2026-02-12)
+- `.devcontainer/` with Dockerfile (python:3.12-slim), docker-compose.yml (postgres:16-alpine + app), devcontainer.json
+- Postgres runs as `db` service with healthcheck; app service mounts workspace and sets all env vars
+- `postCreateCommand` installs pip dependencies; `postStartCommand` auto-starts uvicorn on port 8000 with `--reload`
+- Ports 8000 (FastAPI) and 5432 (PostgreSQL) forwarded; VS Code extensions: Python, debugpy, Ruff
+- India NCDC scraper removed (no public API); scheduler imports cleaned up
+
 ## Next Steps
-- **Redeploy to Railway**: The batch dedup optimization and TimescaleDB removal have been committed but not yet deployed. Run `railway up` to update the live app.
 - **India data**: Covered by WHO FluNet (country-level). India has no public flu surveillance API (NCDC/IDSP data is login-gated or PDF-only), so the dedicated India scraper was removed.
 - **Brazil SVS `fetch_latest()` downloads full year**: The scheduled scraper downloads the entire current-year CSV (~300MB) every 12 hours. This is wasteful but unavoidable since OpenDataSUS doesn't offer incremental/date-filtered downloads. Could reduce frequency to weekly (data updates Wednesdays).
 - **UKHSA regional backfill**: The `--regions` flag exists but hasn't been run yet. Would add 9 UKHSA regions but is slow due to rate limiting (~9 * 12 years * 10s = ~18 min).
