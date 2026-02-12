@@ -5,15 +5,18 @@
   "workspaceFolder": "/workspace",
   "features": {
     "ghcr.io/devcontainers/features/git:1": {},
-    "ghcr.io/devcontainers/features/github-cli:1": {}
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    }
   },
   "forwardPorts": [8000, 5432],
   "portsAttributes": {
     "8000": { "label": "FastAPI", "onAutoForward": "notify" },
     "5432": { "label": "PostgreSQL", "onAutoForward": "silent" }
   },
-  "postCreateCommand": "pip install -r backend/requirements.txt",
-  "postStartCommand": "nohup uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload > /tmp/uvicorn.log 2>&1 & echo 'FastAPI server starting on port 8000'",
+  "postCreateCommand": "pip install -r backend/requirements.txt && npm install -g @openai/codex",
+  "postStartCommand": "bash .devcontainer/start.sh",
   "customizations": {
     "vscode": {
       "extensions": [
