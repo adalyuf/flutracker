@@ -3,5 +3,7 @@ data/
 !frontend/data/
 __pycache__/
 *.pyc
+.pytest_cache/
+node_modules/
 file::memory:
 .claude/settings.local.json

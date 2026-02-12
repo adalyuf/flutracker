@@ -15,7 +15,7 @@
     "8000": { "label": "FastAPI", "onAutoForward": "notify" },
     "5432": { "label": "PostgreSQL", "onAutoForward": "silent" }
   },
-  "postCreateCommand": "pip install -r backend/requirements.txt && npm install -g @openai/codex",
+  "postCreateCommand": "pip install -r backend/requirements.txt && npm install -g @openai/codex @railway/cli",
   "postStartCommand": "bash .devcontainer/start.sh",
   "customizations": {
     "vscode": {
