@@ -1,19 +1,18 @@
 """Pytest configuration and shared fixtures."""
 
-import asyncio
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock
+from typing import Any
 
 import pytest
-import pytest_asyncio
-from contextlib import asynccontextmanager
-from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.pool import NullPool
+import asyncio
+import httpx
+from sqlalchemy import create_engine, event as sa_event
+from sqlalchemy.orm import Session, sessionmaker
 
 from backend.app.database import Base, get_db
 from backend.app.main import app
-from backend.app.models import Country, FluCase, Anomaly
+from backend.app.models import Anomaly, Country, FluCase
 
 
 # No-op lifespan so TestClient doesn't try to connect to the real DB
@@ -25,15 +24,32 @@ async def _noop_lifespan(app):
 app.router.lifespan_context = _noop_lifespan
 
 
-# Use SQLite for tests (in-memory)
-TEST_DATABASE_URL = "sqlite+aiosqlite:///file::memory:?cache=shared"
+class AsyncSessionAdapter:
+    """Tiny async facade over a sync SQLAlchemy session for tests."""
 
+    def __init__(self, session: Session):
+        self._session = session
 
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
+    async def execute(self, *args: Any, **kwargs: Any):
+        return self._session.execute(*args, **kwargs)
+
+    async def commit(self) -> None:
+        self._session.commit()
+
+    async def flush(self) -> None:
+        self._session.flush()
+
+    async def rollback(self) -> None:
+        self._session.rollback()
+
+    async def close(self) -> None:
+        self._session.close()
+
+    async def refresh(self, instance: Any) -> None:
+        self._session.refresh(instance)
+
+    def add(self, instance: Any) -> None:
+        self._session.add(instance)
 
 
 def _register_sqlite_functions(dbapi_conn, connection_record):
@@ -47,121 +63,161 @@ def _register_sqlite_functions(dbapi_conn, connection_record):
             value = dt.fromisoformat(value)
         if part == "day":
             return value.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
-        elif part == "week":
-            # ISO week: Monday-based
+        if part == "week":
             day_of_week = value.weekday()
             start = value - timedelta(days=day_of_week)
             return start.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
-        elif part == "month":
+        if part == "month":
             return value.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
         return value.isoformat()
 
     dbapi_conn.create_function("date_trunc", 2, date_trunc)
 
 
-@pytest_asyncio.fixture(scope="function")
-async def db_engine():
-    engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
-
-    from sqlalchemy import event as sa_event
-    sa_event.listen(engine.sync_engine, "connect", _register_sqlite_functions)
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield engine
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    await engine.dispose()
+@pytest.fixture(scope="function")
+def db_engine(tmp_path):
+    test_db = tmp_path / "test.db"
+    engine = create_engine(f"sqlite:///{test_db}")
+    sa_event.listen(engine, "connect", _register_sqlite_functions)
+    Base.metadata.create_all(bind=engine)
+    try:
+        yield engine
+    finally:
+        Base.metadata.drop_all(bind=engine)
+        engine.dispose()
 
 
-@pytest_asyncio.fixture(scope="function")
-async def db_session(db_engine):
-    session_maker = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
-    async with session_maker() as session:
-        yield session
+@pytest.fixture(scope="function")
+def session_factory(db_engine):
+    return sessionmaker(bind=db_engine, expire_on_commit=False)
 
 
-@pytest_asyncio.fixture(scope="function")
-async def seeded_db(db_session):
+@pytest.fixture(scope="function")
+def db_session(session_factory):
+    session = session_factory()
+    adapted = AsyncSessionAdapter(session)
+    try:
+        yield adapted
+    finally:
+        session.close()
+
+
+@pytest.fixture(scope="function")
+def seeded_db(session_factory):
     """Database with sample test data."""
-    # Add test countries
-    countries = [
-        Country(code="US", name="United States", population=340_000_000, continent="North America"),
-        Country(code="GB", name="United Kingdom", population=68_000_000, continent="Europe"),
-        Country(code="BR", name="Brazil", population=216_000_000, continent="South America"),
-    ]
-    for c in countries:
-        db_session.add(c)
+    session = session_factory()
+    try:
+        # Add test countries
+        countries = [
+            Country(code="US", name="United States", population=340_000_000, continent="North America"),
+            Country(code="GB", name="United Kingdom", population=68_000_000, continent="Europe"),
+            Country(code="BR", name="Brazil", population=216_000_000, continent="South America"),
+        ]
+        for c in countries:
+            session.add(c)
 
-    # Add test cases
-    now = datetime.utcnow()
-    for i in range(12):
-        week_start = now - timedelta(weeks=12 - i)
-        for country, base in [("US", 5000), ("GB", 1000), ("BR", 3000)]:
-            # Simulate a flu season curve
-            multiplier = 1 + 0.5 * (6 - abs(i - 6)) / 6
-            cases = int(base * multiplier)
-            db_session.add(FluCase(
-                time=week_start,
-                country_code=country,
-                new_cases=cases,
-                flu_type="H3N2" if i % 3 == 0 else "H1N1",
-                source="test",
-            ))
-            # Add some with region data
-            if country == "US":
-                for state, factor in [("California", 0.12), ("Texas", 0.09), ("Florida", 0.07)]:
-                    db_session.add(FluCase(
-                        time=week_start,
-                        country_code="US",
-                        region=state,
-                        new_cases=int(cases * factor),
-                        flu_type="H3N2" if i % 3 == 0 else "H1N1",
-                        source="test",
-                    ))
+        # Add test cases
+        now = datetime.utcnow()
+        for i in range(12):
+            week_start = now - timedelta(weeks=12 - i)
+            for country, base in [("US", 5000), ("GB", 1000), ("BR", 3000)]:
+                multiplier = 1 + 0.5 * (6 - abs(i - 6)) / 6
+                cases = int(base * multiplier)
+                session.add(FluCase(
+                    time=week_start,
+                    country_code=country,
+                    new_cases=cases,
+                    flu_type="H3N2" if i % 3 == 0 else "H1N1",
+                    source="test",
+                ))
+                if country == "US":
+                    for state, factor in [("California", 0.12), ("Texas", 0.09), ("Florida", 0.07)]:
+                        session.add(FluCase(
+                            time=week_start,
+                            country_code="US",
+                            region=state,
+                            new_cases=int(cases * factor),
+                            flu_type="H3N2" if i % 3 == 0 else "H1N1",
+                            source="test",
+                        ))
 
-    # Add a test anomaly
-    db_session.add(Anomaly(
-        detected_at=now,
-        country_code="US",
-        metric="weekly_cases",
-        z_score=3.2,
-        description="Spike: +45% vs baseline (United States)",
-        severity="high",
-    ))
+        # Add a test anomaly
+        session.add(Anomaly(
+            detected_at=now,
+            country_code="US",
+            metric="weekly_cases",
+            z_score=3.2,
+            description="Spike: +45% vs baseline (United States)",
+            severity="high",
+        ))
 
-    await db_session.commit()
-    yield db_session
+        session.commit()
+        yield
+    finally:
+        session.close()
+
+
+def _override_get_db_with_factory(session_factory):
+    async def override_get_db():
+        session = session_factory()
+        adapted = AsyncSessionAdapter(session)
+        try:
+            yield adapted
+            await adapted.commit()
+        except Exception:
+            await adapted.rollback()
+            raise
+        finally:
+            await adapted.close()
+
+    return override_get_db
 
 
 @pytest.fixture
-def client(db_session):
+def client(session_factory):
     """FastAPI test client with overridden database dependency."""
-    async def override_get_db():
-        yield db_session
+    app.dependency_overrides[get_db] = _override_get_db_with_factory(session_factory)
 
-    app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as c:
-        yield c
-    app.dependency_overrides.clear()
+    class SyncASGIClient:
+        def get(self, path: str):
+            async def _request():
+                transport = httpx.ASGITransport(app=app)
+                async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
+                    return await c.get(path)
+
+            return asyncio.run(_request())
+
+    try:
+        yield SyncASGIClient()
+    finally:
+        app.dependency_overrides.clear()
 
 
 @pytest.fixture
-def seeded_client(seeded_db):
+def seeded_client(session_factory, seeded_db):
     """FastAPI test client backed by a seeded database."""
-    async def override_get_db():
-        yield seeded_db
+    app.dependency_overrides[get_db] = _override_get_db_with_factory(session_factory)
 
-    app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as c:
-        yield c
-    app.dependency_overrides.clear()
+    class SyncASGIClient:
+        def get(self, path: str):
+            async def _request():
+                transport = httpx.ASGITransport(app=app)
+                async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
+                    return await c.get(path)
+
+            return asyncio.run(_request())
+
+    try:
+        yield SyncASGIClient()
+    finally:
+        app.dependency_overrides.clear()
 
 
 @pytest.fixture(autouse=True)
 def clear_cache():
     """Clear the in-memory cache before each test."""
     from backend.app import cache
+
     cache.invalidate()
     yield
     cache.invalidate()

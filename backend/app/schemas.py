@@ -129,7 +129,7 @@ class SeverityOut(BaseModel):
     country_code: str
     country_name: str
     score: float = Field(ge=0, le=100)
-    components: dict[str, float]
+    components: dict[str, float | str | None]
     level: str  # low, moderate, high, very_high, critical
 
 
