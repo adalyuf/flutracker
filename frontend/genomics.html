@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FluTracker Genomics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/genomics.css">
+</head>
+<body>
+    <header class="header">
+        <div>
+            <h1>FluTracker Genomics</h1>
+            <p>Sequence clade dynamics by country over time</p>
+        </div>
+        <a class="back-link" href="/">Back to Dashboard</a>
+    </header>
+
+    <main class="layout">
+        <section class="controls">
+            <label>
+                Years
+                <select id="yearsSelect">
+                    <option value="10" selected>10 years</option>
+                    <option value="5">5 years</option>
+                    <option value="3">3 years</option>
+                    <option value="1">1 year</option>
+                </select>
+            </label>
+            <label>
+                Country
+                <select id="countrySelect">
+                    <option value="">Global</option>
+                </select>
+            </label>
+            <label>
+                Top Clades
+                <select id="topNSelect">
+                    <option value="4">4</option>
+                    <option value="6" selected>6</option>
+                    <option value="8">8</option>
+                </select>
+            </label>
+        </section>
+
+        <section class="cards">
+            <article class="card">
+                <span>Total Sequences</span>
+                <strong id="kpiSequences">-</strong>
+            </article>
+            <article class="card">
+                <span>Countries</span>
+                <strong id="kpiCountries">-</strong>
+            </article>
+            <article class="card">
+                <span>Unique Clades</span>
+                <strong id="kpiClades">-</strong>
+            </article>
+            <article class="card">
+                <span>Dominant Clade</span>
+                <strong id="kpiDominant">-</strong>
+            </article>
+        </section>
+
+        <section class="panel">
+            <h2>Monthly Sequence Counts by Clade</h2>
+            <svg id="trendChart"></svg>
+        </section>
+
+        <section class="panel">
+            <h2>Top Countries by Sequences</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Country</th>
+                        <th>Sequences</th>
+                        <th>Unique Clades</th>
+                        <th>Last Sample</th>
+                    </tr>
+                </thead>
+                <tbody id="countriesBody">
+                    <tr><td colspan="4">Loading...</td></tr>
+                </tbody>
+            </table>
+        </section>
+    </main>
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="js/genomics.js"></script>
+</body>
+</html>

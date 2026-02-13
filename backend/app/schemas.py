@@ -167,3 +167,41 @@ class HealthOut(BaseModel):
     database: str
     scrapers_active: int
     last_scrape: datetime | None = None
+
+
+# --- Genomics schemas ---
+
+class GenomicsSummaryOut(BaseModel):
+    total_sequences: int
+    countries_tracked: int
+    unique_clades: int
+    dominant_clade: str | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    last_updated: datetime | None = None
+
+
+class GenomicsTrendPoint(BaseModel):
+    month: str
+    clade: str
+    sequences: int
+
+
+class GenomicsTrendsOut(BaseModel):
+    country_code: str | None = None
+    years: int
+    top_clades: list[str]
+    data: list[GenomicsTrendPoint]
+
+
+class GenomicsCountryRow(BaseModel):
+    country_code: str
+    country_name: str
+    sequences: int
+    unique_clades: int
+    last_sample_date: datetime | None = None
+
+
+class GenomicsCountriesOut(BaseModel):
+    years: int
+    countries: list[GenomicsCountryRow]

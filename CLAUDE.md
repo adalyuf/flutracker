@@ -151,6 +151,47 @@ All backfills use batch deduplication (single SELECT + Python set lookup) for fa
 - Ports 8000 (FastAPI) and 5432 (PostgreSQL) forwarded; VS Code extensions: Python, debugpy, Ruff
 - India NCDC scraper removed (no public API); scheduler imports cleaned up
 
+## Updates (Completed 2026-02-13)
+- **Dashboard chart controls simplified**:
+  - Removed `Trend` and `Forecast` tabs from `frontend/index.html`.
+  - `Historical` is now default chart tab (`Charts.currentView = "historical"` in `frontend/js/charts.js`).
+  - Forecast is rendered as a dotted extension directly inside Historical view for selected countries (uses `/api/forecast` in `drawHistoricalOverlay()`).
+- **Country select toggle behavior**:
+  - Clicking a selected country again now clears selection (`FluMap.selectCountry()` dispatches `countrySelected` with `code=null`).
+  - App handler clears table highlight and map drill-down layers on deselect.
+- **Historical endpoint output migrated to calendar dates**:
+  - `/api/trends/historical-seasons` now returns `date` as `YYYY-MM-DD` instead of week-of-season indexes.
+  - Historical chart parser supports both new date format and legacy numeric week offsets for backward compatibility.
+- **New Genomics page added (separate from dashboard)**:
+  - New standalone page: `frontend/genomics.html` with dedicated assets:
+    - `frontend/js/genomics.js`
+    - `frontend/css/genomics.css`
+  - Existing dashboard page at `/` was not replaced.
+- **New Genomics backend API**:
+  - New model: `GenomicSequence` in `backend/app/models.py`
+  - New router: `backend/app/routers/genomics.py`
+  - Endpoints:
+    - `GET /api/genomics/summary`
+    - `GET /api/genomics/trends`
+    - `GET /api/genomics/countries`
+  - Router registered in `backend/app/main.py`.
+- **Genomics backfill script**:
+  - Added `python -m backend.ingestion.backfill_genomics --years N`.
+  - Source used: Nextstrain seasonal flu datasets (`h3n2`, `h1n1pdm`, `vic`, `yam`; prefers 12y datasets, falls back to 6y/2y).
+  - Stores sequence metadata (sample date, country, lineage, clade, strain) into `genomic_sequences`.
+  - Dedup key: `(source_dataset, strain_name)`.
+- **Backfill verification run on production DB**:
+  - `--years 1` inserted 425 records.
+  - `--years 10` inserted 4,726 records.
+  - Verified total in DB after full run: `total_sequences=5151`, `country_codes=75`.
+- **Genomics UX interactions**:
+  - Added chart tooltips on clade hover with month + sequence count.
+  - Added click-to-pin clade behavior (dim others) and legend hover/click interactions.
+- **Tests added/passed**:
+  - New API tests: `backend/tests/test_api/test_genomics.py`.
+  - Seed data updated with genomic rows in `backend/tests/conftest.py`.
+  - Genomics tests passing locally.
+
 ## Next Steps
 - **India data**: Covered by WHO FluNet (country-level). India has no public flu surveillance API (NCDC/IDSP data is login-gated or PDF-only), so the dedicated India scraper was removed.
 - **Brazil SVS `fetch_latest()` downloads full year**: The scheduled scraper downloads the entire current-year CSV (~300MB) every 12 hours. This is wasteful but unavoidable since OpenDataSUS doesn't offer incremental/date-filtered downloads. Could reduce frequency to weekly (data updates Wednesdays).

@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import (
     Column, String, Integer, BigInteger, Float, Text, DateTime,
-    ForeignKey, CheckConstraint, Index
+    ForeignKey, CheckConstraint, Index, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
 from backend.app.database import Base
@@ -89,3 +89,26 @@ class ScrapeLog(Base):
     )
     records_fetched = Column(Integer, default=0)
     error_message = Column(Text)
+
+
+class GenomicSequence(Base):
+    __tablename__ = "genomic_sequences"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    sample_date = Column(DateTime(timezone=True), nullable=False)
+    country_code = Column(String(2))
+    country_name = Column(Text)
+    lineage = Column(Text, nullable=False)  # h3n2, h1n1pdm, vic, yam
+    clade = Column(Text)
+    strain_name = Column(Text, nullable=False)
+    source = Column(Text, nullable=False, default="nextstrain")
+    source_dataset = Column(Text, nullable=False)
+    inserted_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("source_dataset", "strain_name", name="uq_genomic_dataset_strain"),
+        Index("idx_genomic_sample_date", sample_date.desc()),
+        Index("idx_genomic_country_date", "country_code", sample_date.desc()),
+        Index("idx_genomic_lineage_date", "lineage", sample_date.desc()),
+        Index("idx_genomic_clade_date", "clade", sample_date.desc()),
+    )

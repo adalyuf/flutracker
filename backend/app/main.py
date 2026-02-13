@@ -7,7 +7,16 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.app.config import get_settings
 from backend.app.database import Base
-from backend.app.routers import cases, countries, trends, map_data, anomalies, forecast, severity
+from backend.app.routers import (
+    anomalies,
+    cases,
+    countries,
+    forecast,
+    genomics,
+    map_data,
+    severity,
+    trends,
+)
 
 settings = get_settings()
 logger = structlog.get_logger()
@@ -82,6 +91,7 @@ app.include_router(map_data.router, prefix="/api")
 app.include_router(anomalies.router, prefix="/api")
 app.include_router(forecast.router, prefix="/api")
 app.include_router(severity.router, prefix="/api")
+app.include_router(genomics.router, prefix="/api")
 
 
 @app.get("/api/health")

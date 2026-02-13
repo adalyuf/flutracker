@@ -1,0 +1,166 @@
+:root {
+    --bg: #0f1419;
+    --panel: #1b2232;
+    --panel-2: #20293d;
+    --text: #e8eaed;
+    --muted: #97a1ad;
+    --border: #2d3951;
+    --accent: #00d4aa;
+    --accent-2: #4a9eff;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: "DM Sans", sans-serif;
+    background: radial-gradient(circle at top right, #1f2c47 0, #0f1419 45%);
+    color: var(--text);
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(15, 20, 25, 0.9);
+    backdrop-filter: blur(4px);
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 1.3rem;
+}
+
+.header p {
+    margin: 2px 0 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.back-link {
+    color: var(--accent-2);
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.layout {
+    padding: 18px 22px;
+    display: grid;
+    gap: 14px;
+}
+
+.controls {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.controls label {
+    display: grid;
+    gap: 6px;
+    font-size: 0.82rem;
+    color: var(--muted);
+}
+
+.controls select {
+    min-width: 130px;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+    gap: 10px;
+}
+
+.card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+}
+
+.card span {
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+.card strong {
+    display: block;
+    margin-top: 6px;
+    font-family: "JetBrains Mono", monospace;
+}
+
+.panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+}
+
+.panel h2 {
+    margin: 0 0 10px;
+    font-size: 1rem;
+}
+
+#trendChart {
+    width: 100%;
+    height: 340px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+th, td {
+    text-align: left;
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--border);
+}
+
+th {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+}
+
+.geno-tooltip {
+    position: fixed;
+    z-index: 2000;
+    pointer-events: none;
+    background: #101726;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    min-width: 170px;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+
+.geno-tooltip .k {
+    color: var(--muted);
+    font-size: 0.75rem;
+}
+
+.geno-tooltip .v {
+    color: var(--text);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.82rem;
+    margin-top: 2px;
+}
+
+@media (max-width: 880px) {
+    .cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

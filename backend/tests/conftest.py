@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from backend.app.database import Base, get_db
 from backend.app.main import app
-from backend.app.models import Anomaly, Country, FluCase
+from backend.app.models import Anomaly, Country, FluCase, GenomicSequence
 
 
 # No-op lifespan so TestClient doesn't try to connect to the real DB
@@ -150,6 +150,26 @@ def seeded_db(session_factory):
             description="Spike: +45% vs baseline (United States)",
             severity="high",
         ))
+
+        # Add genomic sequence metadata samples
+        genomic_rows = [
+            ("US", "United States", "h3n2", "3C.2a1b.2a.2", "USA/CA-001/2024", now - timedelta(days=30)),
+            ("US", "United States", "h3n2", "3C.2a1b.2a.2", "USA/TX-001/2024", now - timedelta(days=45)),
+            ("GB", "United Kingdom", "h1n1pdm", "6B.1A.5a.2", "GBR/LON-001/2024", now - timedelta(days=40)),
+            ("BR", "Brazil", "h3n2", "3C.2a1b.2a.2", "BRA/SP-001/2024", now - timedelta(days=50)),
+            ("BR", "Brazil", "vic", "V1A.3a.2", "BRA/RJ-001/2023", now - timedelta(days=320)),
+        ]
+        for code, name, lineage, clade, strain, sample_date in genomic_rows:
+            session.add(GenomicSequence(
+                sample_date=sample_date,
+                country_code=code,
+                country_name=name,
+                lineage=lineage,
+                clade=clade,
+                strain_name=strain,
+                source="test",
+                source_dataset="test_dataset",
+            ))
 
         session.commit()
         yield
