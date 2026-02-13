@@ -101,7 +101,7 @@ const Dashboard = {
                 case 'cases':
                     return mult * ((a.total_recent_cases || 0) - (b.total_recent_cases || 0));
                 case 'trend':
-                    return mult * ((a.trend_pct || 0) - (b.trend_pct || 0));
+                    return mult * ((a.prior_year_diff || 0) - (b.prior_year_diff || 0));
                 case 'severity': {
                     const sa = this.severityMap[a.code]?.score || 0;
                     const sb = this.severityMap[b.code]?.score || 0;
@@ -153,8 +153,8 @@ const Dashboard = {
                     <td class="col-country">${chevron}${c.name}</td>
                     <td class="col-cases">${Utils.formatNumber(c.total_recent_cases || 0)}</td>
                     <td class="col-rate">${per100k}</td>
-                    <td class="col-trend ${Utils.trendClass(c.trend_pct)}">
-                        ${Utils.trendArrow(c.trend_pct)} ${Utils.formatTrend(c.trend_pct)}
+                    <td class="col-trend ${Utils.trendClass(c.prior_year_diff)}">
+                        ${Utils.trendArrow(c.prior_year_diff)} ${Utils.formatCaseDelta(c.prior_year_diff)}
                     </td>
                     <td class="col-sparkline">
                         <svg class="sparkline-svg" data-code="${c.code}" width="90" height="24"></svg>
@@ -195,8 +195,8 @@ const Dashboard = {
                             <td class="col-country region-name">${r.region}</td>
                             <td class="col-cases">${Utils.formatNumber(r.total_cases)}</td>
                             <td class="col-rate">${rPer100k}</td>
-                            <td class="col-trend ${r.trend_pct != null ? Utils.trendClass(r.trend_pct) : ''}">
-                                ${r.trend_pct != null ? Utils.trendArrow(r.trend_pct) + ' ' + Utils.formatTrend(r.trend_pct) : '—'}
+                            <td class="col-trend ${r.prior_year_diff != null ? Utils.trendClass(r.prior_year_diff) : ''}">
+                                ${r.prior_year_diff != null ? Utils.trendArrow(r.prior_year_diff) + ' ' + Utils.formatCaseDelta(r.prior_year_diff) : '—'}
                             </td>
                             <td class="col-sparkline"></td>
                             <td class="col-severity"></td>
@@ -250,7 +250,7 @@ const Dashboard = {
             this.expandedSet.add(code);
             this.expandedCountries[code] = [{
                 region: 'Loading...', total_cases: 0, flu_types: null,
-                lat: null, lon: null, trend_pct: null, population: null, _loading: true,
+                lat: null, lon: null, trend_pct: null, prior_year_diff: null, population: null, _loading: true,
             }];
             this.render();
 

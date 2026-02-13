@@ -21,6 +21,15 @@ const Utils = {
     },
 
     /**
+     * Format signed case delta values.
+     */
+    formatCaseDelta(delta) {
+        if (delta == null) return '—';
+        const sign = delta > 0 ? '+' : '';
+        return `${sign}${Utils.formatNumber(delta)}`;
+    },
+
+    /**
      * Get CSS class for trend direction.
      */
     trendClass(pct) {

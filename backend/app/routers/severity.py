@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.database import get_db
 from backend.app.models import FluCase, Country
 from backend.app.schemas import SeverityOut
+from backend.app.country_metadata import COUNTRY_META
 from backend.app import cache
 
 router = APIRouter(tags=["severity"])
@@ -22,7 +23,7 @@ async def get_severity_index(db: AsyncSession = Depends(get_db)):
     week_ago = anchor - timedelta(days=7)
     two_weeks_ago = anchor - timedelta(days=14)
 
-    # Get all countries
+    # Get seeded countries for metadata/population lookups.
     countries_result = await db.execute(select(Country))
     countries = {c.code: c for c in countries_result.scalars().all()}
 
@@ -62,14 +63,26 @@ async def get_severity_index(db: AsyncSession = Depends(get_db)):
             type_max[row.country_code] = row.type_total
             dominant_types[row.country_code] = row.flu_type
 
+    # Only score countries with recent activity (current or previous week).
+    relevant_codes = set(current_cases) | set(prev_cases)
     results = []
-    for code, country in countries.items():
+    for code in relevant_codes:
+        country = countries.get(code)
+        if country is not None:
+            name = country.name
+            pop = country.population
+        else:
+            meta = COUNTRY_META.get(code)
+            if not meta:
+                continue
+            name = meta["name"]
+            pop = meta["population"]
+
         current = current_cases.get(code, 0)
         prev = prev_cases.get(code, 0)
-        if not country.population:
+        if not pop:
             continue
 
-        pop = country.population
         # Component 1: Cases per 100k (0-100 scale, capped at 100)
         rate_per_100k = current / pop * 100_000
         rate_score = min(rate_per_100k / 50 * 100, 100)  # 50 per 100k = max score
@@ -98,7 +111,7 @@ async def get_severity_index(db: AsyncSession = Depends(get_db)):
 
         results.append(SeverityOut(
             country_code=code,
-            country_name=country.name,
+            country_name=name,
             score=score,
             components={
                 "rate_per_100k": round(rate_per_100k, 2),

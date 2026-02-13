@@ -71,7 +71,6 @@
                 <h2 id="chartTitle">Historical Comparison</h2>
                 <div class="chart-controls">
                     <button class="chart-btn active" data-view="historical">Historical</button>
-                    <button class="chart-btn" data-view="subtype">Subtypes</button>
                     <button class="chart-btn" data-view="compare">Compare</button>
                 </div>
             </div>
@@ -134,8 +133,8 @@
                 <select id="sortBy" class="filter-select">
                     <option value="cases_desc">Cases (High to Low)</option>
                     <option value="cases_asc">Cases (Low to High)</option>
-                    <option value="trend_desc">Trend (Rising)</option>
-                    <option value="trend_asc">Trend (Falling)</option>
+                    <option value="trend_desc">Prior Year Δ (Rising)</option>
+                    <option value="trend_asc">Prior Year Δ (Falling)</option>
                     <option value="severity_desc">Severity (High to Low)</option>
                     <option value="name_asc">Name (A-Z)</option>
                 </select>
@@ -149,7 +148,7 @@
                         <th class="col-country sortable" data-sort="name">Country</th>
                         <th class="col-cases sortable" data-sort="cases">Cases (7d)</th>
                         <th class="col-rate sortable" data-sort="rate">Per 100k</th>
-                        <th class="col-trend sortable" data-sort="trend">Trend</th>
+                        <th class="col-trend sortable" data-sort="trend">Prior Year Δ</th>
                         <th class="col-sparkline">12-Week</th>
                         <th class="col-severity sortable" data-sort="severity">Severity</th>
                         <th class="col-subtypes">Dominant Type</th>

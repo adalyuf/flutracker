@@ -40,6 +40,7 @@
     .header-left {
         flex-direction: column;
         gap: 2px;
+        align-items: flex-start;
     }
 
     .subtitle {

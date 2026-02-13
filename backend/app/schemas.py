@@ -11,6 +11,7 @@ class CountryOut(BaseModel):
     continent: str | None = None
     last_scraped: datetime | None = None
     total_recent_cases: int | None = None
+    prior_year_diff: int | None = None
     trend_pct: float | None = None
     severity_score: float | None = None
 

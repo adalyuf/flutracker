@@ -21,7 +21,8 @@ def _country_info(code: str, db_countries: dict[str, Country]) -> dict | None:
     if code in COUNTRY_META:
         m = COUNTRY_META[code]
         return {"name": m["name"], "continent": m["continent"], "population": m["population"], "last_scraped": None}
-    return None
+    # Keep countries that have data even when metadata mapping is missing.
+    return {"name": code, "continent": None, "population": None, "last_scraped": None}
 
 
 @router.get("/countries", response_model=list[CountryOut])
@@ -36,7 +37,8 @@ async def list_countries(
 
     anchor = (await db.execute(select(func.max(FluCase.time)))).scalar() or datetime.utcnow()
     week_ago = anchor - timedelta(days=7)
-    two_weeks_ago = anchor - timedelta(days=14)
+    prior_year_start = week_ago - timedelta(weeks=52)
+    prior_year_end = anchor - timedelta(weeks=52)
 
     # Get all country codes that have data
     codes_result = await db.execute(select(distinct(FluCase.country_code)))
@@ -58,28 +60,27 @@ async def list_countries(
     result_7d = await db.execute(cases_7d)
     totals_7d = {r.country_code: r.total for r in result_7d.all()}
 
-    # Get previous 7-day totals for trend
-    cases_prev = (
+    # Get prior-year 7-day totals for year-over-year difference
+    cases_prior_year = (
         select(
             FluCase.country_code,
             func.sum(FluCase.new_cases).label("total"),
         )
-        .where(and_(FluCase.time >= two_weeks_ago, FluCase.time < week_ago))
+        .where(and_(FluCase.time >= prior_year_start, FluCase.time < prior_year_end))
         .group_by(FluCase.country_code)
     )
-    result_prev = await db.execute(cases_prev)
-    totals_prev = {r.country_code: r.total for r in result_prev.all()}
+    result_prior_year = await db.execute(cases_prior_year)
+    totals_prior_year = {r.country_code: r.total for r in result_prior_year.all()}
 
     out = []
     for code in sorted(data_codes):
         info = _country_info(code, db_countries)
-        if not info:
-            continue
         if continent and info["continent"] != continent:
             continue
         recent = totals_7d.get(code, 0)
-        prev = totals_prev.get(code, 0)
-        trend = ((recent - prev) / prev * 100) if prev else 0.0
+        prior_year = totals_prior_year.get(code, 0)
+        prior_year_diff = recent - prior_year
+        trend = ((recent - prior_year) / prior_year * 100) if prior_year else 0.0
         out.append(CountryOut(
             code=code,
             name=info["name"],
@@ -87,6 +88,7 @@ async def list_countries(
             continent=info["continent"],
             last_scraped=info["last_scraped"],
             total_recent_cases=recent,
+            prior_year_diff=prior_year_diff,
             trend_pct=round(trend, 1),
         ))
     out.sort(key=lambda c: c.name)

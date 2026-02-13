@@ -53,9 +53,6 @@ const Charts = {
     async refresh() {
         this._updateDimensions();
         switch (this.currentView) {
-            case 'subtype':
-                await this.drawSubtypeChart();
-                break;
             case 'historical':
                 await this.drawHistoricalOverlay();
                 break;

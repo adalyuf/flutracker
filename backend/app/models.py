@@ -49,6 +49,7 @@ class FluCase(Base):
 
     __table_args__ = (
         Index("idx_cases_country", "country_code", time.desc()),
+        Index("idx_cases_country_source_time", "country_code", "source", time.desc()),
         Index("idx_cases_region", "country_code", "region", time.desc()),
         Index("idx_cases_time", time.desc()),
         Index("idx_cases_source_time", "source", time.desc()),

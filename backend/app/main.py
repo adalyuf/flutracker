@@ -26,6 +26,7 @@ logger = structlog.get_logger()
 async def _init_db():
     """Create tables and load seed data on first run."""
     from backend.app.database import engine, async_session
+    from backend.app.country_metadata import COUNTRY_META
     from backend.app.models import Country  # noqa: ensure models loaded
     from sqlalchemy.exc import OperationalError
 
@@ -80,6 +81,41 @@ async def _init_db():
                         logger.info("Seed data loaded", countries=len(data["countries"]))
                 else:
                     logger.info("Countries already seeded", count=count)
+
+                # Ensure country metadata coverage for all known ISO codes.
+                existing_result = await db.execute(select(Country))
+                existing = {c.code: c for c in existing_result.scalars().all()}
+                inserted = 0
+                updated = 0
+                for code, meta in COUNTRY_META.items():
+                    row = existing.get(code)
+                    if row is None:
+                        db.add(Country(
+                            code=code,
+                            name=meta["name"],
+                            population=meta["population"],
+                            continent=meta["continent"],
+                            scrape_frequency="daily",
+                        ))
+                        inserted += 1
+                        continue
+
+                    changed = False
+                    if not row.population and meta["population"]:
+                        row.population = meta["population"]
+                        changed = True
+                    if not row.continent and meta["continent"]:
+                        row.continent = meta["continent"]
+                        changed = True
+                    if not row.name and meta["name"]:
+                        row.name = meta["name"]
+                        changed = True
+                    if changed:
+                        updated += 1
+
+                if inserted or updated:
+                    await db.commit()
+                    logger.info("Country metadata synchronized", inserted=inserted, updated=updated)
             return
         except Exception as exc:
             if attempt >= attempts or not _is_retryable_db_error(exc):
