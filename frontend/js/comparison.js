@@ -102,11 +102,6 @@ const Comparison = {
             .nice()
             .range([height, 0]);
 
-        // Grid
-        g.append('g')
-            .attr('class', 'grid')
-            .call(d3.axisLeft(y).tickSize(-width).tickFormat(''));
-
         const line = d3.line()
             .x(d => x(d.date))
             .y(d => y(d.value))

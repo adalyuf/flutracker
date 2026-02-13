@@ -108,28 +108,6 @@ const Charts = {
             .nice()
             .range([this.height, 0]);
 
-        // Grid lines
-        g.append('g')
-            .attr('class', 'grid')
-            .call(d3.axisLeft(y).tickSize(-this.width).tickFormat(''));
-
-        // Area
-        const area = d3.area()
-            .x(d => x(d.date))
-            .y0(this.height)
-            .y1(d => y(d.cases))
-            .curve(d3.curveMonotoneX);
-
-        g.append('path')
-            .datum(points)
-            .attr('class', 'trend-area')
-            .attr('d', area)
-            .style('opacity', 0)
-            .transition()
-            .duration(800)
-            .delay(400)
-            .style('opacity', 0.1);
-
         // Line
         const line = d3.line()
             .x(d => x(d.date))
@@ -211,30 +189,29 @@ const Charts = {
             .append('g')
             .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
 
-        // Draw as a horizontal bar chart since we have aggregate data
+        // Draw as a clean ranked list (no bars) to reduce chart noise.
         const y = d3.scaleBand()
             .domain(data.breakdown.map(d => d.flu_type))
             .range([0, this.height])
-            .padding(0.2);
+            .padding(0.35);
 
         const x = d3.scaleLinear()
             .domain([0, d3.max(data.breakdown, d => d.percentage)])
             .range([0, this.width]);
 
-        g.selectAll('.bar')
+        g.selectAll('.subtype-dot')
             .data(data.breakdown)
-            .join('rect')
-            .attr('y', d => y(d.flu_type))
-            .attr('x', 0)
-            .attr('height', y.bandwidth())
-            .attr('width', 0)
+            .join('circle')
+            .attr('class', 'subtype-dot')
+            .attr('cy', d => y(d.flu_type) + y.bandwidth() / 2)
+            .attr('cx', 0)
+            .attr('r', 0)
             .attr('fill', d => Utils.fluTypeColor(d.flu_type))
-            .attr('rx', 3)
             .transition()
-            .duration(600)
-            .delay((d, i) => i * 80)
+            .duration(450)
+            .delay((d, i) => i * 60)
             .ease(d3.easeCubicOut)
-            .attr('width', d => x(d.percentage));
+            .attr('r', 5);
 
         // Labels
         g.selectAll('.bar-label')
@@ -259,7 +236,8 @@ const Charts = {
      */
     async drawHistoricalOverlay() {
         const [result, forecastResult] = await Promise.all([
-            API.getHistoricalSeasons(this.currentCountry, 5),
+            // Show 10 total seasons: current + previous 9.
+            API.getHistoricalSeasons(this.currentCountry, 9),
             this.currentCountry ? API.getForecast(this.currentCountry, 4) : Promise.resolve(null),
         ]);
 
@@ -355,53 +333,13 @@ const Charts = {
             .nice()
             .range([this.height, 0]);
 
-        // Grid
-        g.append('g')
-            .attr('class', 'grid')
-            .call(d3.axisLeft(y).tickSize(-this.width).tickFormat(''));
-
         const line = d3.line()
             .x(d => x(d.seasonDate))
             .y(d => y(d.cases))
             .curve(d3.curveMonotoneX);
 
-        // Historical range band (min/max across past seasons)
+        // Historical range band removed to keep the chart visually clean.
         if (pastSeasons.length > 0) {
-            // Build a map of normalized season date -> [cases values] across past seasons.
-            const dateMap = {};
-            pastSeasons.forEach(s => {
-                s.data.forEach(d => {
-                    const key = d3.timeFormat('%m-%d')(d.seasonDate);
-                    if (!dateMap[key]) {
-                        dateMap[key] = {
-                            seasonDate: d.seasonDate,
-                            values: [],
-                        };
-                    }
-                    dateMap[key].values.push(d.cases);
-                });
-            });
-
-            const bandData = Object.values(dateMap)
-                .sort((a, b) => a.seasonDate - b.seasonDate)
-                .map(d => ({
-                    seasonDate: d.seasonDate,
-                    min: d3.min(d.values),
-                    max: d3.max(d.values),
-                }));
-
-            const area = d3.area()
-                .x(d => x(d.seasonDate))
-                .y0(d => y(d.min))
-                .y1(d => y(d.max))
-                .curve(d3.curveMonotoneX);
-
-            g.append('path')
-                .datum(bandData)
-                .attr('d', area)
-                .attr('fill', '#4a9eff')
-                .attr('opacity', 0.08);
-
             // Historical season lines
             const historicalColors = ['#5f6368', '#4a4f5a', '#3a3f4a', '#2a2f3a', '#6b7280'];
             pastSeasons.forEach((season, idx) => {
@@ -431,6 +369,60 @@ const Charts = {
                 .ease(d3.easeCubicOut)
                 .attr('stroke-dashoffset', 0);
         }
+
+        // Show season label when hovering/clicking a historical line.
+        const interactiveSeasons = [
+            { label: result.current_season.label, data: currentData, color: '#00d4aa', className: 'trend-line' },
+            ...pastSeasons.map((s, i) => ({
+                label: s.label,
+                data: s.data,
+                color: ['#5f6368', '#4a4f5a', '#3a3f4a', '#2a2f3a', '#6b7280'][i % 5],
+                className: 'historical-line',
+            })),
+        ].filter(s => s.data && s.data.length > 0);
+
+        let pinnedSeasonLabel = null;
+        interactiveSeasons.forEach((season) => {
+            g.append('path')
+                .datum(season.data)
+                .attr('class', season.className)
+                .attr('d', line)
+                .attr('stroke', season.color)
+                .attr('stroke-width', season.className === 'trend-line' ? 3.5 : 2.6)
+                .attr('fill', 'none')
+                .attr('opacity', 0)
+                .style('pointer-events', 'stroke')
+                .on('mousemove', (event) => {
+                    if (pinnedSeasonLabel) return;
+                    this.tooltip
+                        .style('display', 'block')
+                        .html(`
+                            <div class="tooltip-date">Season ${season.label}</div>
+                        `)
+                        .style('left', `${event.offsetX + 15}px`)
+                        .style('top', `${event.offsetY - 10}px`);
+                })
+                .on('mouseleave', () => {
+                    if (!pinnedSeasonLabel) {
+                        this.tooltip.style('display', 'none');
+                    }
+                })
+                .on('click', (event) => {
+                    pinnedSeasonLabel = pinnedSeasonLabel === season.label ? null : season.label;
+                    if (pinnedSeasonLabel) {
+                        this.tooltip
+                            .style('display', 'block')
+                            .html(`
+                                <div class="tooltip-date">Season ${season.label}</div>
+                                <div class="tooltip-value">Pinned</div>
+                            `)
+                            .style('left', `${event.offsetX + 15}px`)
+                            .style('top', `${event.offsetY - 10}px`);
+                    } else {
+                        this.tooltip.style('display', 'none');
+                    }
+                });
+        });
 
         // Forecast extension (dotted line) for selected country.
         if (currentData.length > 0 && forecastData.length > 0) {

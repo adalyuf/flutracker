@@ -15,6 +15,7 @@ const FluMap = {
     selectedCountry: null,
     currentMetric: 'per_100k',
     stateTopoCache: {},  // countryCode -> topoJSON data
+    countryCentroids: null,
 
     // State FIPS codes -> state names for US TopoJSON matching
     _usFipsToName: {
@@ -72,6 +73,7 @@ const FluMap = {
         // Initialize layers
         this.anomalyLayer = L.layerGroup().addTo(this.map);
         this.regionLayer = L.layerGroup().addTo(this.map);
+        this.countryCentroids = this._computeCountryCentroids();
 
         // Map is locked to per_100k metric
     },
@@ -103,6 +105,29 @@ const FluMap = {
         this.updateChoropleth();
         this.updateAnomalyMarkers(anomalies);
         this.updateLegend();
+    },
+
+    /**
+     * Normalize anomalies to one display marker per country that can be mapped.
+     * Picks the highest z-score anomaly for each country.
+     */
+    getDisplayAnomalies(anomalies) {
+        if (!anomalies || anomalies.length === 0) return [];
+
+        const centroids = this.countryCentroids || this._computeCountryCentroids();
+        const byCountry = new Map();
+
+        anomalies.forEach(a => {
+            if (!a || !a.country_code) return;
+            if (!centroids[a.country_code]) return;
+
+            const existing = byCountry.get(a.country_code);
+            if (!existing || (a.z_score || 0) > (existing.z_score || 0)) {
+                byCountry.set(a.country_code, a);
+            }
+        });
+
+        return Array.from(byCountry.values()).sort((a, b) => (b.z_score || 0) - (a.z_score || 0));
     },
 
     /**
@@ -381,8 +406,7 @@ const FluMap = {
         this.anomalyLayer.clearLayers();
         if (!anomalies) return;
 
-        // We'd need lat/lon for anomaly locations — use country centroids for now
-        const centroids = this._countryCentroids();
+        const centroids = this.countryCentroids || this._computeCountryCentroids();
 
         anomalies.forEach(a => {
             const pos = centroids[a.country_code];
@@ -550,7 +574,7 @@ const FluMap = {
         return numericToAlpha2;
     },
 
-    _countryCentroids() {
+    _manualCentroidOverrides() {
         return {
             US: [39.8, -98.5], GB: [54.0, -2.0], IN: [20.6, 78.9],
             BR: [-14.2, -51.9], DE: [51.2, 10.5], FR: [46.2, 2.2],
@@ -565,6 +589,26 @@ const FluMap = {
             PL: [51.9, 19.1], AR: [-38.4, -63.6], DZ: [28.0, 1.7],
             IQ: [33.2, 43.7], SA: [23.9, 45.1], PE: [-9.2, -75.0],
             MA: [31.8, -7.1], MY: [4.2, 101.9], GH: [7.9, -1.0],
+            BE: [50.8, 4.5], HU: [47.2, 19.5], SE: [62.1, 15.0],
         };
+    },
+
+    _computeCountryCentroids() {
+        if (!this.topoData) return this._manualCentroidOverrides();
+
+        const iso3to2 = this._buildIso3to2Map();
+        const geoFeatures = topojson.feature(this.topoData, this.topoData.objects.countries);
+        const centroids = {};
+
+        geoFeatures.features.forEach((feature) => {
+            const code2 = iso3to2[feature.id] || iso3to2[parseInt(feature.id, 10)];
+            if (!code2 || !feature.geometry) return;
+            const [lng, lat] = d3.geoCentroid(feature);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+            centroids[code2] = [lat, lng];
+        });
+
+        // Keep manual values as fallback/override for problematic geometries.
+        return { ...centroids, ...this._manualCentroidOverrides() };
     },
 };

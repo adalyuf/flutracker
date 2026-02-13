@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
@@ -124,7 +124,7 @@ class BaseScraper(ABC):
             return []
 
         # Get the time range and unique country/source combos to narrow the query
-        times = {r.time for r in records}
+        times = {self._normalize_time(r.time) for r in records}
         country_codes = {r.country_code for r in records}
         sources = {r.source for r in records}
         min_time = min(times)
@@ -136,6 +136,8 @@ class BaseScraper(ABC):
             FluCase.country_code,
             FluCase.source,
             FluCase.region,
+            FluCase.city,
+            FluCase.flu_type,
         ).where(and_(
             FluCase.time >= min_time,
             FluCase.time <= max_time,
@@ -144,16 +146,32 @@ class BaseScraper(ABC):
         ))
         result = await db.execute(query)
         existing = {
-            (row.time, row.country_code, row.source, row.region)
+            self._record_key(
+                row.time,
+                row.country_code,
+                row.source,
+                row.region,
+                row.city,
+                row.flu_type,
+            )
             for row in result.all()
         }
 
-        # Filter out duplicates in Python
+        # Filter out duplicates in Python, including duplicates within this batch.
         unique = []
+        seen = set(existing)
         for r in records:
-            key = (r.time, r.country_code, r.source, r.region)
-            if key not in existing:
+            key = self._record_key(
+                r.time,
+                r.country_code,
+                r.source,
+                r.region,
+                r.city,
+                r.flu_type,
+            )
+            if key not in seen:
                 unique.append(r)
+                seen.add(key)
         return unique
 
     async def _store(self, db: AsyncSession, records: list[FluCaseRecord]) -> int:
@@ -183,6 +201,33 @@ class BaseScraper(ABC):
             country = result.scalar_one_or_none()
             if country:
                 country.last_scraped = datetime.utcnow()
+
+    @staticmethod
+    def _normalize_time(value: datetime) -> datetime:
+        """Normalize datetimes to UTC-aware for stable deduplication keys."""
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    @classmethod
+    def _record_key(
+        cls,
+        time: datetime,
+        country_code: str,
+        source: str,
+        region: Optional[str],
+        city: Optional[str],
+        flu_type: Optional[str],
+    ) -> tuple[datetime, str, str, Optional[str], Optional[str], Optional[str]]:
+        """Canonical key identifying one logical flu case row."""
+        return (
+            cls._normalize_time(time),
+            country_code,
+            source,
+            region,
+            city,
+            flu_type,
+        )
 
     async def close(self):
         await self.client.aclose()

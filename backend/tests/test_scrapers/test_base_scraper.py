@@ -1,6 +1,6 @@
 """Tests for BaseScraper logic using a concrete stub subclass."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 import pytest_asyncio
@@ -109,4 +109,63 @@ async def test_run_logs_failure(db_session):
     )).scalar_one()
     assert log.status == "error"
     assert "scrape failed" in log.error_message
+    await scraper.close()
+
+
+@pytest.mark.asyncio
+async def test_deduplicate_uses_flu_type_and_normalizes_time(db_session):
+    """Same week/country/source but different flu_type should not collapse."""
+    db_session.add(FluCase(
+        time=datetime(2025, 1, 6, tzinfo=timezone.utc),
+        country_code="XX",
+        new_cases=100,
+        flu_type="H1N1",
+        source="test_stub",
+    ))
+    await db_session.flush()
+
+    scraper = StubScraper()
+    records = [
+        FluCaseRecord(
+            time=datetime(2025, 1, 6),  # naive (simulates parser output)
+            country_code="XX",
+            new_cases=100,
+            flu_type="H1N1",
+            source="test_stub",
+        ),
+        FluCaseRecord(
+            time=datetime(2025, 1, 6),  # same timestamp, different subtype
+            country_code="XX",
+            new_cases=50,
+            flu_type="H3N2",
+            source="test_stub",
+        ),
+    ]
+    result = await scraper._deduplicate(db_session, records)
+    assert len(result) == 1
+    assert result[0].flu_type == "H3N2"
+    await scraper.close()
+
+
+@pytest.mark.asyncio
+async def test_deduplicate_filters_duplicate_records_within_batch(db_session):
+    scraper = StubScraper()
+    records = [
+        FluCaseRecord(
+            time=datetime(2025, 1, 6),
+            country_code="XX",
+            new_cases=100,
+            flu_type="H1N1",
+            source="test_stub",
+        ),
+        FluCaseRecord(
+            time=datetime(2025, 1, 6),
+            country_code="XX",
+            new_cases=100,
+            flu_type="H1N1",
+            source="test_stub",
+        ),
+    ]
+    result = await scraper._deduplicate(db_session, records)
+    assert len(result) == 1
     await scraper.close()

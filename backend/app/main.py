@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 import structlog
@@ -26,35 +27,72 @@ async def _init_db():
     """Create tables and load seed data on first run."""
     from backend.app.database import engine, async_session
     from backend.app.models import Country  # noqa: ensure models loaded
+    from sqlalchemy.exc import OperationalError
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        logger.info("Database tables ensured")
+    def _is_retryable_db_error(exc: Exception) -> bool:
+        current: BaseException | None = exc
+        while current is not None:
+            if isinstance(current, (OperationalError, OSError, ConnectionError)):
+                return True
+            message = str(current).lower()
+            if (
+                "name resolution" in message
+                or "could not translate host name" in message
+                or "connection refused" in message
+                or "connection reset" in message
+                or "timeout" in message
+            ):
+                return True
+            current = current.__cause__ or current.__context__
+        return False
 
-    # Load seed data if countries table is empty
-    async with async_session() as db:
-        from sqlalchemy import select, func
-        count = (await db.execute(select(func.count()).select_from(Country))).scalar()
-        if count == 0:
-            import json
-            from pathlib import Path
-            seed_file = Path(__file__).parent.parent / "seed_data" / "countries.json"
-            if seed_file.exists():
-                with open(seed_file) as f:
-                    data = json.load(f)
-                for entry in data["countries"]:
-                    db.add(Country(
-                        code=entry["code"],
-                        name=entry["name"],
-                        population=entry["population"],
-                        continent=entry["continent"],
-                        scraper_id=entry["scraper_id"],
-                        scrape_frequency=entry["scrape_frequency"],
-                    ))
-                await db.commit()
-                logger.info("Seed data loaded", countries=len(data["countries"]))
-        else:
-            logger.info("Countries already seeded", count=count)
+    attempts = max(1, settings.db_startup_max_attempts)
+    initial_backoff = max(1, settings.db_startup_initial_backoff_seconds)
+    max_backoff = max(initial_backoff, settings.db_startup_max_backoff_seconds)
+
+    for attempt in range(1, attempts + 1):
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+                logger.info("Database tables ensured")
+
+            # Load seed data if countries table is empty
+            async with async_session() as db:
+                from sqlalchemy import select, func
+                count = (await db.execute(select(func.count()).select_from(Country))).scalar()
+                if count == 0:
+                    import json
+                    from pathlib import Path
+                    seed_file = Path(__file__).parent.parent / "seed_data" / "countries.json"
+                    if seed_file.exists():
+                        with open(seed_file) as f:
+                            data = json.load(f)
+                        for entry in data["countries"]:
+                            db.add(Country(
+                                code=entry["code"],
+                                name=entry["name"],
+                                population=entry["population"],
+                                continent=entry["continent"],
+                                scraper_id=entry["scraper_id"],
+                                scrape_frequency=entry["scrape_frequency"],
+                            ))
+                        await db.commit()
+                        logger.info("Seed data loaded", countries=len(data["countries"]))
+                else:
+                    logger.info("Countries already seeded", count=count)
+            return
+        except Exception as exc:
+            if attempt >= attempts or not _is_retryable_db_error(exc):
+                raise
+            backoff = min(initial_backoff * (2 ** (attempt - 1)), max_backoff)
+            logger.warning(
+                "Database unavailable during startup; retrying",
+                attempt=attempt,
+                max_attempts=attempts,
+                retry_in_seconds=backoff,
+                error=str(exc),
+            )
+            await asyncio.sleep(backoff)
 
 
 @asynccontextmanager
@@ -99,7 +137,6 @@ async def health_check():
     return {"status": "ok"}
 
 # Serve frontend static files (used when running without nginx, e.g. Railway)
-import os
 from pathlib import Path
 
 _frontend_dir = Path(__file__).resolve().parent.parent.parent / "frontend"

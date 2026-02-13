@@ -9,7 +9,7 @@ Data source: https://www.who.int/tools/flunet
 API endpoint: https://xmart-api-public.who.int/FLUMART/VIW_FNT (WHO xMart OData)
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import structlog
 
@@ -119,7 +119,7 @@ class WHOFluNetScraper(BaseScraper):
         try:
             week_date = datetime.strptime(
                 f"{iso_year}-W{int(iso_week):02d}-1", "%G-W%V-%u"
-            )
+            ).replace(tzinfo=timezone.utc)
         except (ValueError, TypeError):
             return []
 

@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     scrape_enabled: bool = True
     scrape_interval_hours: int = 6
     cache_ttl: int = 900
+    db_startup_max_attempts: int = 8
+    db_startup_initial_backoff_seconds: int = 2
+    db_startup_max_backoff_seconds: int = 30
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 

@@ -39,6 +39,7 @@ async def detect_anomalies(db: AsyncSession) -> list[Anomaly]:
     # Get all countries with data
     countries_result = await db.execute(select(Country))
     countries = countries_result.scalars().all()
+    pop_map = {c.code: c.population for c in countries if c.population}
 
     new_anomalies = []
 
@@ -80,23 +81,26 @@ async def detect_anomalies(db: AsyncSession) -> list[Anomaly]:
         recent_mean = np.mean(recent)
         z_score = (recent_mean - baseline_mean) / baseline_std
 
-        if abs(z_score) >= THRESHOLDS["low"]:
-            direction = "spike" if z_score > 0 else "drop"
-            pct_change = round((recent_mean - baseline_mean) / baseline_mean * 100, 1)
+        if not country.population or country.population <= 0:
+            continue
+        recent_per_100k = (recent_mean / country.population) * 100_000
+
+        if z_score >= THRESHOLDS["low"] and recent_per_100k > 1.0:
+            pct_change = round((recent_mean - baseline_mean) / baseline_mean * 100, 1) if baseline_mean > 0 else 0.0
 
             anomaly = Anomaly(
                 detected_at=now,
                 country_code=country.code,
                 metric="weekly_cases",
                 z_score=round(z_score, 2),
-                description=f"{direction.capitalize()}: {pct_change:+.1f}% vs 12-week baseline ({country.name})",
+                description=f"Spike: {pct_change:+.1f}% vs 12-week baseline ({country.name})",
                 severity=classify_severity(z_score),
             )
             new_anomalies.append(anomaly)
             db.add(anomaly)
 
     # Also check region-level anomalies for countries with regional data
-    region_anomalies = await _detect_region_anomalies(db, now, baseline_start, recent_start)
+    region_anomalies = await _detect_region_anomalies(db, now, baseline_start, recent_start, pop_map)
     new_anomalies.extend(region_anomalies)
 
     await db.commit()
@@ -108,6 +112,7 @@ async def _detect_region_anomalies(
     now: datetime,
     baseline_start: datetime,
     recent_start: datetime,
+    pop_map: dict[str, int],
 ) -> list[Anomaly]:
     """Detect anomalies at the region level for countries with detailed data."""
     # Get distinct country+region combinations
@@ -153,16 +158,20 @@ async def _detect_region_anomalies(
         recent_mean = np.mean(recent)
         z_score = (recent_mean - baseline_mean) / baseline_std
 
+        country_population = pop_map.get(country_code)
+        if not country_population or country_population <= 0:
+            continue
+        recent_per_100k = (recent_mean / country_population) * 100_000
+
         # Only flag high severity for regions to avoid noise
-        if abs(z_score) >= THRESHOLDS["high"]:
-            direction = "spike" if z_score > 0 else "drop"
+        if z_score >= THRESHOLDS["high"] and recent_per_100k > 1.0:
             anomaly = Anomaly(
                 detected_at=now,
                 country_code=country_code,
                 region=region,
                 metric="weekly_cases",
                 z_score=round(z_score, 2),
-                description=f"Regional {direction}: {region} ({country_code})",
+                description=f"Regional spike: {region} ({country_code})",
                 severity=classify_severity(z_score),
             )
             anomalies.append(anomaly)

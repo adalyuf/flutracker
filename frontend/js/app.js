@@ -94,12 +94,14 @@ const App = {
                 Comparison.init(sorted);
             }
 
+            const displayAnomalies = FluMap.getDisplayAnomalies(anomalies || []);
+
             if (mapData || severityData || anomalies) {
-                FluMap.update(mapData, severityData, anomalies);
+                FluMap.update(mapData, severityData, displayAnomalies);
             }
 
             if (anomalies) {
-                Anomalies.update(anomalies);
+                Anomalies.update(displayAnomalies);
             }
 
             // Update last-updated timestamp

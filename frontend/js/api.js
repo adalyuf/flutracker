@@ -52,7 +52,7 @@ const API = {
         return this._fetch('/trends/global', { granularity, weeks });
     },
 
-    async getHistoricalSeasons(country = null, seasons = 5) {
+    async getHistoricalSeasons(country = null, seasons = 9) {
         return this._fetch('/trends/historical-seasons', { country, seasons });
     },
 
