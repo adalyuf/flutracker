@@ -58,12 +58,7 @@
             <div class="panel-header">
                 <h2>Global Map</h2>
                 <div class="map-controls">
-                    <select id="mapMetric">
-                        <option value="cases">Total Cases (7d)</option>
-                        <option value="per_100k">Cases per 100k</option>
-                        <option value="trend">Trend %</option>
-                        <option value="severity">Severity Index</option>
-                    </select>
+                    <span class="map-metric-label">Cases per 100k</span>
                 </div>
             </div>
             <div id="map" class="map-container"></div>
@@ -92,6 +87,27 @@
             </div>
         </section>
     </main>
+
+    <!-- Genomics & Subtypes Row -->
+    <div class="secondary-grid">
+        <section class="panel mini-chart-panel">
+            <div class="panel-header">
+                <h2>Clade Trends <span class="panel-period">1 year</span></h2>
+                <a href="genomics.html" class="panel-link">Full Genomics Dashboard &rarr;</a>
+            </div>
+            <div class="mini-chart-container" id="cladeChartContainer">
+                <svg id="cladeChart"></svg>
+            </div>
+        </section>
+        <section class="panel mini-chart-panel">
+            <div class="panel-header">
+                <h2>Subtype Trends <span class="panel-period">1 year</span></h2>
+            </div>
+            <div class="mini-chart-container" id="subtypeChartContainer">
+                <svg id="subtypeChart"></svg>
+            </div>
+        </section>
+    </div>
 
     <!-- Dashboard Table -->
     <section class="panel dashboard-panel">
@@ -148,7 +164,7 @@
 
     <!-- Footer -->
     <footer class="footer">
-        <p>Data sources: WHO FluNet, CDC FluView, UKHSA, NCDC India, InfoGripe Brazil</p>
+        <p>Data sources: WHO FluNet, Nextstrain</p>
         <p>FluTracker is for informational purposes only. Not a substitute for official public health guidance.</p>
     </footer>
 
@@ -164,7 +180,8 @@
     <script src="js/charts.js?v=3"></script>
     <script src="js/anomalies.js?v=3"></script>
     <script src="js/comparison.js?v=3"></script>
+    <script src="js/mini-charts.js?v=4"></script>
     <script src="js/dashboard.js?v=3"></script>
-    <script src="js/app.js?v=3"></script>
+    <script src="js/app.js?v=4"></script>
 </body>
 </html>

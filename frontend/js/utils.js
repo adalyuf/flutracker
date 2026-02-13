@@ -62,31 +62,22 @@ const Utils = {
     },
 
     /**
-     * Choropleth color scale for cases per 100k.
+     * Choropleth color scale for cases per 100k population.
+     * Calibrated for WHO FluNet lab-confirmed specimen counts:
+     * most countries 0-5, high-activity countries 5-40+.
      */
-    choroplethColor(value, metric) {
+    choroplethColor(value) {
         if (value == null || value === 0) return '#1a1f2e';
 
-        // Different scales for different metrics
-        if (metric === 'trend') {
-            // Diverging: green (negative) -> yellow (0) -> red (positive)
-            if (value < -20) return '#00c853';
-            if (value < -5) return '#69f0ae';
-            if (value < 5) return '#ffd700';
-            if (value < 20) return '#ff8c00';
-            return '#ff4444';
-        }
-
-        // Sequential scale for cases/severity
         const stops = [
-            [0, '#1a1f2e'],
-            [1, '#0d3b66'],
-            [5, '#1565c0'],
-            [15, '#00897b'],
-            [30, '#ffd700'],
-            [60, '#ff8c00'],
-            [100, '#ff4444'],
-            [200, '#ff0040'],
+            [0,   '#1a1f2e'],
+            [0.1, '#0d3b66'],
+            [0.5, '#1565c0'],
+            [1,   '#00897b'],
+            [3,   '#ffd700'],
+            [10,  '#ff8c00'],
+            [20,  '#ff4444'],
+            [40,  '#ff0040'],
         ];
 
         for (let i = stops.length - 1; i >= 0; i--) {

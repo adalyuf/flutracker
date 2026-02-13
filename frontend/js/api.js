@@ -87,4 +87,12 @@ const API = {
     async getHealth() {
         return this._fetch('/health');
     },
+
+    async getGenomicsTrends(years = 1, topN = 6) {
+        return this._fetch('/genomics/trends', { years, top_n: topN });
+    },
+
+    async getFluTypeTrends(country = null, days = 365, topN = 6) {
+        return this._fetch('/flu-types/trends', { country, days, top_n: topN });
+    },
 };

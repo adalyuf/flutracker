@@ -1,7 +1,8 @@
 /* === Responsive Design === */
 
 @media (max-width: 1024px) {
-    .main-grid {
+    .main-grid,
+    .secondary-grid {
         grid-template-columns: 1fr;
         padding: 12px 16px;
         gap: 12px;

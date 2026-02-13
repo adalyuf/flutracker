@@ -147,6 +147,19 @@ class FluTypesOut(BaseModel):
     breakdown: list[FluTypeBreakdown]
 
 
+class FluTypeTrendPoint(BaseModel):
+    week: str
+    flu_type: str
+    cases: int
+
+
+class FluTypeTrendsOut(BaseModel):
+    country_code: str | None = None
+    period_days: int
+    top_types: list[str]
+    data: list[FluTypeTrendPoint]
+
+
 # --- Summary schemas ---
 
 class SummaryOut(BaseModel):

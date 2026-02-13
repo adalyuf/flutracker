@@ -191,6 +191,74 @@ body {
     padding: 16px 24px;
 }
 
+/* === Secondary Grid (Genomics + Subtypes) === */
+.secondary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    padding: 0 24px;
+}
+
+.mini-chart-panel {
+    min-height: 320px;
+}
+
+.mini-chart-container {
+    height: 260px;
+    padding: 8px 12px;
+    position: relative;
+}
+
+.mini-chart-container svg {
+    width: 100%;
+    height: 100%;
+}
+
+.mini-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    padding: 6px 14px 10px;
+}
+
+.mini-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.mini-legend-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.panel-period {
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    font-weight: 400;
+    margin-left: 6px;
+}
+
+.panel-link {
+    font-size: 0.78rem;
+    color: var(--accent-cyan);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+.panel-link:hover {
+    color: var(--accent-amber);
+}
+
 /* === Panels === */
 .panel {
     background: var(--bg-panel);
@@ -284,6 +352,22 @@ body {
 .legend-label {
     font-family: var(--font-mono);
     font-size: 0.7rem;
+}
+
+.legend-unit {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-left: 4px;
+}
+
+.map-metric-label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
 }
 
 /* === Charts === */
@@ -451,7 +535,7 @@ body {
 
 /* === Dashboard === */
 .dashboard-panel {
-    margin: 0 24px 24px;
+    margin: 16px 24px 24px;
 }
 
 .dashboard-controls {
@@ -663,6 +747,31 @@ body {
     text-align: center;
     padding: 40px;
     color: var(--text-muted);
+}
+
+/* === Mini-chart tooltip (shared with genomics page) === */
+.geno-tooltip {
+    position: fixed;
+    z-index: 2000;
+    pointer-events: none;
+    background: var(--bg-panel, #101726);
+    border: 1px solid var(--border-color, #2d3951);
+    border-radius: 8px;
+    padding: 8px 10px;
+    min-width: 150px;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+
+.geno-tooltip .k {
+    color: var(--text-muted, #97a1ad);
+    font-size: 0.72rem;
+}
+
+.geno-tooltip .v {
+    color: var(--text-primary, #e8eaed);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.8rem;
+    margin-top: 2px;
 }
 
 /* === Footer === */

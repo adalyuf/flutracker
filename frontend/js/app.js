@@ -15,6 +15,7 @@ const App = {
         // Initialize modules
         await FluMap.init();
         Charts.init();
+        MiniCharts.init();
         Anomalies.init();
         Dashboard.init();
 
@@ -110,8 +111,11 @@ const App = {
                     `Updated: ${new Date().toLocaleTimeString()}`;
             }
 
-            // Draw initial chart
-            await Charts.refresh();
+            // Draw initial charts
+            await Promise.all([
+                Charts.refresh(),
+                MiniCharts.refresh(),
+            ]);
 
         } catch (err) {
             console.error('Failed to load data', err);

@@ -13,7 +13,7 @@ const FluMap = {
     topoData: null,
     countryData: {},
     selectedCountry: null,
-    currentMetric: 'cases',
+    currentMetric: 'per_100k',
     stateTopoCache: {},  // countryCode -> topoJSON data
 
     // State FIPS codes -> state names for US TopoJSON matching
@@ -73,11 +73,7 @@ const FluMap = {
         this.anomalyLayer = L.layerGroup().addTo(this.map);
         this.regionLayer = L.layerGroup().addTo(this.map);
 
-        // Map metric selector
-        document.getElementById('mapMetric').addEventListener('change', (e) => {
-            this.currentMetric = e.target.value;
-            this.updateChoropleth();
-        });
+        // Map is locked to per_100k metric
     },
 
     /**
@@ -134,7 +130,7 @@ const FluMap = {
                 const value = this._getMetricValue(data);
 
                 return {
-                    fillColor: Utils.choroplethColor(value, this.currentMetric),
+                    fillColor: Utils.choroplethColor(value),
                     fillOpacity: 0.75,
                     weight: 1,
                     color: '#2a3346',
@@ -425,13 +421,8 @@ const FluMap = {
      */
     updateLegend() {
         const legend = document.getElementById('mapLegend');
-        const labels = this.currentMetric === 'trend'
-            ? ['<-20%', '-5%', '0%', '+5%', '>+20%']
-            : ['0', '5', '15', '30', '60', '100+'];
-
-        const colors = this.currentMetric === 'trend'
-            ? ['#00c853', '#69f0ae', '#ffd700', '#ff8c00', '#ff4444']
-            : ['#1a1f2e', '#0d3b66', '#1565c0', '#00897b', '#ffd700', '#ff4444'];
+        const labels = ['0', '0.1', '0.5', '1', '3', '10', '20', '40+'];
+        const colors = ['#1a1f2e', '#0d3b66', '#1565c0', '#00897b', '#ffd700', '#ff8c00', '#ff4444', '#ff0040'];
 
         legend.innerHTML = `
             <span class="legend-label">${labels[0]}</span>
@@ -439,6 +430,7 @@ const FluMap = {
                 ${colors.map(c => `<div class="segment" style="background:${c}"></div>`).join('')}
             </div>
             <span class="legend-label">${labels[labels.length - 1]}</span>
+            <span class="legend-unit">per 100k</span>
         `;
     },
 
@@ -481,24 +473,19 @@ const FluMap = {
 
     _getMetricValue(data) {
         if (!data) return 0;
-        switch (this.currentMetric) {
-            case 'per_100k': return data.cases_per_100k || 0;
-            case 'trend': return data.trend_pct || 0;
-            case 'severity': return data.severity_score || 0;
-            default: return data.new_cases_7d || 0;
-        }
+        return data.cases_per_100k || 0;
     },
 
     _createPopup(data) {
         return `
             <div class="popup-country-name">${data.country_name}</div>
             <div class="popup-stat">
-                <span class="popup-stat-label">Cases (7d):</span>
-                <span class="popup-stat-value">${Utils.formatNumber(data.new_cases_7d)}</span>
+                <span class="popup-stat-label">Per 100k:</span>
+                <span class="popup-stat-value">${data.cases_per_100k != null ? data.cases_per_100k.toFixed(2) : '—'}</span>
             </div>
             <div class="popup-stat">
-                <span class="popup-stat-label">Per 100k:</span>
-                <span class="popup-stat-value">${data.cases_per_100k != null ? data.cases_per_100k.toFixed(1) : '—'}</span>
+                <span class="popup-stat-label">Cases (14d):</span>
+                <span class="popup-stat-value">${Utils.formatNumber(data.new_cases_7d)}</span>
             </div>
             <div class="popup-stat">
                 <span class="popup-stat-label">Trend:</span>

@@ -31,51 +31,6 @@ async def run_who_flunet():
             await scraper.close()
 
 
-async def run_usa_cdc():
-    """Run USA CDC FluView scraper."""
-    from backend.ingestion.scrapers.usa_cdc import USACDCScraper
-
-    async with async_session() as db:
-        scraper = USACDCScraper()
-        try:
-            count = await scraper.run(db)
-            logger.info("USA CDC scrape complete", records=count)
-        except Exception as e:
-            logger.error("USA CDC scrape failed", error=str(e))
-        finally:
-            await scraper.close()
-
-
-async def run_uk_ukhsa():
-    """Run UK UKHSA scraper."""
-    from backend.ingestion.scrapers.uk_ukhsa import UKUKHSAScraper
-
-    async with async_session() as db:
-        scraper = UKUKHSAScraper()
-        try:
-            count = await scraper.run(db)
-            logger.info("UK UKHSA scrape complete", records=count)
-        except Exception as e:
-            logger.error("UK UKHSA scrape failed", error=str(e))
-        finally:
-            await scraper.close()
-
-
-async def run_brazil_svs():
-    """Run Brazil SVS scraper."""
-    from backend.ingestion.scrapers.brazil_svs import BrazilSVSScraper
-
-    async with async_session() as db:
-        scraper = BrazilSVSScraper()
-        try:
-            count = await scraper.run(db)
-            logger.info("Brazil SVS scrape complete", records=count)
-        except Exception as e:
-            logger.error("Brazil SVS scrape failed", error=str(e))
-        finally:
-            await scraper.close()
-
-
 async def run_anomaly_detection():
     """Run anomaly detection on current data."""
     from backend.app.services.anomaly_detection import detect_anomalies
@@ -99,28 +54,6 @@ def start_scheduler():
         id="who_flunet",
         name="WHO FluNet Scraper",
         next_run_time=datetime.utcnow(),  # Run immediately on startup
-    )
-
-    # Country-specific scrapers: staggered throughout the day
-    scheduler.add_job(
-        run_usa_cdc,
-        trigger=CronTrigger(hour="*/6", minute=15),
-        id="usa_cdc",
-        name="USA CDC Scraper",
-    )
-
-    scheduler.add_job(
-        run_uk_ukhsa,
-        trigger=CronTrigger(hour="*/6", minute=30),
-        id="uk_ukhsa",
-        name="UK UKHSA Scraper",
-    )
-
-    scheduler.add_job(
-        run_brazil_svs,
-        trigger=CronTrigger(day_of_week="wed", hour=6, minute=0),
-        id="brazil_svs",
-        name="Brazil SVS Scraper",
     )
 
     # Anomaly detection: run after each scrape cycle

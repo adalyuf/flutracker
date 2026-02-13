@@ -18,16 +18,16 @@
       "name": "India",
       "population": 1440000000,
       "continent": "Asia",
-      "scraper_id": "india_ncdc",
-      "scrape_frequency": "daily"
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
     },
     {
       "code": "US",
       "name": "United States",
       "population": 340000000,
       "continent": "North America",
-      "scraper_id": "usa_cdc",
-      "scrape_frequency": "daily"
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
     },
     {
       "code": "ID",
@@ -50,8 +50,8 @@
       "name": "Brazil",
       "population": 217000000,
       "continent": "South America",
-      "scraper_id": "brazil_svs",
-      "scrape_frequency": "daily"
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
     },
     {
       "code": "NG",
@@ -170,16 +170,16 @@
       "name": "United Kingdom",
       "population": 68000000,
       "continent": "Europe",
-      "scraper_id": "uk_ukhsa",
-      "scrape_frequency": "daily"
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
     },
     {
       "code": "FR",
       "name": "France",
       "population": 68000000,
       "continent": "Europe",
-      "scraper_id": "france_spf",
-      "scrape_frequency": "daily"
+      "scraper_id": "who_flunet",
+      "scrape_frequency": "weekly"
     },
     {
       "code": "TZ",

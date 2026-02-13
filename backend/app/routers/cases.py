@@ -6,7 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.database import get_db
 from backend.app.models import FluCase, Region
-from backend.app.schemas import CaseOut, CasesByRegionOut, RegionCases, FluTypesOut, FluTypeBreakdown
+from backend.app.schemas import (
+    CaseOut, CasesByRegionOut, RegionCases,
+    FluTypesOut, FluTypeBreakdown,
+    FluTypeTrendsOut, FluTypeTrendPoint,
+)
 
 router = APIRouter(tags=["cases"])
 
@@ -183,4 +187,59 @@ async def get_flu_types(
         country_code=country.upper() if country else None,
         period_days=days,
         breakdown=breakdown,
+    )
+
+
+@router.get("/flu-types/trends", response_model=FluTypeTrendsOut)
+async def get_flu_type_trends(
+    country: str | None = None,
+    days: int = Query(365, le=730),
+    top_n: int = Query(6, ge=1, le=12),
+    db: AsyncSession = Depends(get_db),
+):
+    """Weekly time-series of flu subtypes (stacked area data)."""
+    anchor = (await db.execute(select(func.max(FluCase.time)))).scalar() or datetime.utcnow()
+    since = anchor - timedelta(days=days)
+
+    bucket = func.date_trunc("week", FluCase.time)
+    query = (
+        select(
+            bucket.label("week"),
+            FluCase.flu_type,
+            func.sum(FluCase.new_cases).label("total"),
+        )
+        .where(and_(FluCase.time >= since, FluCase.flu_type.isnot(None)))
+        .group_by("week", FluCase.flu_type)
+        .order_by("week")
+    )
+    if country:
+        query = query.where(FluCase.country_code == country.upper())
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    # Determine top N subtypes by total volume
+    totals: dict[str, int] = {}
+    for r in rows:
+        totals[r.flu_type] = totals.get(r.flu_type, 0) + int(r.total)
+    top_types = [k for k, _ in sorted(totals.items(), key=lambda x: x[1], reverse=True)[:top_n]]
+
+    # Bucket non-top types into "Other"
+    output: dict[tuple[str, str], int] = {}
+    for r in rows:
+        week_dt = r.week if isinstance(r.week, datetime) else datetime.fromisoformat(str(r.week))
+        week_key = week_dt.strftime("%Y-%m-%d")
+        type_key = r.flu_type if r.flu_type in top_types else "Other"
+        key = (week_key, type_key)
+        output[key] = output.get(key, 0) + int(r.total)
+
+    points = [
+        FluTypeTrendPoint(week=week, flu_type=flu_type, cases=n)
+        for (week, flu_type), n in sorted(output.items())
+    ]
+    return FluTypeTrendsOut(
+        country_code=country.upper() if country else None,
+        period_days=days,
+        top_types=top_types,
+        data=points,
     )
