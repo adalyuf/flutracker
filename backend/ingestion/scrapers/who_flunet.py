@@ -39,6 +39,10 @@ AGGREGATE_SUBTYPES = {
     "INF_B": "B (lineage unknown)",
 }
 
+# FluNet publishes UK constituent entities separately.
+# Normalize them to GB so the dashboard treats them as one country.
+UK_COMPONENT_TO_GB = {"XE", "XI", "XS", "XW"}
+
 
 class WHOFluNetScraper(BaseScraper):
     """Scraper for WHO FluNet global influenza data."""
@@ -100,12 +104,34 @@ class WHOFluNetScraper(BaseScraper):
             url = data.get("@odata.nextLink")
             params = None  # nextLink includes params already
 
-        logger.info("FluNet fetch complete", total_records=len(records))
-        return records
+        # Aggregate any duplicate logical keys within this fetch window.
+        # This is especially important for UK normalization where multiple
+        # constituent entries are merged into GB.
+        aggregated: dict[tuple, FluCaseRecord] = {}
+        for r in records:
+            key = (r.time, r.country_code, r.region, r.city, r.flu_type, r.source)
+            if key in aggregated:
+                aggregated[key].new_cases += int(r.new_cases)
+            else:
+                aggregated[key] = FluCaseRecord(
+                    time=r.time,
+                    country_code=r.country_code,
+                    region=r.region,
+                    city=r.city,
+                    new_cases=int(r.new_cases),
+                    flu_type=r.flu_type,
+                    source=r.source,
+                )
+
+        normalized = list(aggregated.values())
+        logger.info("FluNet fetch complete", total_records=len(normalized))
+        return normalized
 
     def _parse_entry(self, entry: dict) -> list[FluCaseRecord]:
         """Parse a single FluNet OData entry into FluCaseRecords."""
-        country_code = (entry.get("ISO2") or "").strip()
+        country_code = (entry.get("ISO2") or "").strip().upper()
+        if country_code in UK_COMPONENT_TO_GB:
+            country_code = "GB"
         if not country_code:
             return []
         if self.target_countries and country_code not in self.target_countries:

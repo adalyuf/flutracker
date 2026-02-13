@@ -165,10 +165,20 @@ const FluMap = {
             onEachFeature: (feature, layer) => {
                 const code2 = resolveCode(feature);
                 const data = code2 ? this.countryData[code2] : null;
+                const countryName = data?.country_name || feature.properties?.name || code2;
 
                 if (data) {
                     layer.bindPopup(this._createPopup(data));
+                } else if (code2) {
+                    layer.bindPopup(`
+                        <div class="popup-country-name">${countryName || code2}</div>
+                        <div class="popup-stat">
+                            <span class="popup-stat-label">No recent map data</span>
+                        </div>
+                    `);
+                }
 
+                if (code2) {
                     layer.on('mouseover', function () {
                         this.setStyle({ weight: 2, color: '#F5A623' });
                         this.bringToFront();
@@ -177,7 +187,7 @@ const FluMap = {
                         this.setStyle({ weight: 1, color: '#2a3346' });
                     });
                     layer.on('click', () => {
-                        this.selectCountry(code2, data.country_name);
+                        this.selectCountry(code2, countryName || code2);
                     });
                 }
             },

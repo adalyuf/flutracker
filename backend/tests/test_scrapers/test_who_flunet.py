@@ -59,3 +59,45 @@ class TestWHOFluNetParser:
         entry = {"ISO2": "US", "ISO_YEAR": 2026, "ISO_WEEK": None}
         records = self.scraper._parse_entry(entry)
         assert len(records) == 0
+
+    def test_parse_entry_maps_uk_constituents_to_gb(self):
+        entry = {
+            "ISO2": "XS",
+            "ISO_YEAR": 2026,
+            "ISO_WEEK": 4,
+            "AH3": 120,
+        }
+        records = self.scraper._parse_entry(entry)
+        assert len(records) == 1
+        assert records[0].country_code == "GB"
+        assert records[0].new_cases == 120
+
+
+@pytest.mark.asyncio
+async def test_fetch_range_aggregates_uk_components(monkeypatch):
+    scraper = WHOFluNetScraper()
+
+    payload = {
+        "value": [
+            {"ISO2": "XE", "ISO_YEAR": 2026, "ISO_WEEK": 4, "AH3": 100},
+            {"ISO2": "XI", "ISO_YEAR": 2026, "ISO_WEEK": 4, "AH3": 50},
+            {"ISO2": "XS", "ISO_YEAR": 2026, "ISO_WEEK": 4, "AH3": 25},
+            {"ISO2": "XW", "ISO_YEAR": 2026, "ISO_WEEK": 4, "AH3": 25},
+        ]
+    }
+
+    class _DummyResponse:
+        def json(self):
+            return payload
+
+    async def _fake_get(url, **kwargs):
+        return _DummyResponse()
+
+    monkeypatch.setattr(scraper, "_get", _fake_get)
+    records = await scraper.fetch_range(2026, 4, 2026, 4)
+    await scraper.close()
+
+    assert len(records) == 1
+    assert records[0].country_code == "GB"
+    assert records[0].flu_type == "H3N2"
+    assert records[0].new_cases == 200
