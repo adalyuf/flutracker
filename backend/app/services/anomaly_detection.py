@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 import numpy as np
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.models import FluCase, Anomaly, Country
@@ -97,12 +97,15 @@ async def detect_anomalies(db: AsyncSession) -> list[Anomaly]:
                 severity=classify_severity(z_score),
             )
             new_anomalies.append(anomaly)
-            db.add(anomaly)
 
     # Also check region-level anomalies for countries with regional data
     region_anomalies = await _detect_region_anomalies(db, now, baseline_start, recent_start, pop_map)
     new_anomalies.extend(region_anomalies)
 
+    # Rebuild anomalies table from latest computation.
+    await db.execute(delete(Anomaly))
+    for anomaly in new_anomalies:
+        db.add(anomaly)
     await db.commit()
     return new_anomalies
 
@@ -175,6 +178,5 @@ async def _detect_region_anomalies(
                 severity=classify_severity(z_score),
             )
             anomalies.append(anomaly)
-            db.add(anomaly)
 
     return anomalies
